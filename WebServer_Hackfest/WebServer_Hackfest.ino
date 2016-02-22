@@ -21,31 +21,24 @@
 #include <SPI.h>
 #include <Ethernet2.h>
 
-// Enter a MAC address and IP address for your controller below.
-// The IP address will be dependent on your local network:
 byte mac[] = {
   0x90, 0xA2, 0xDA, 0x10, 0x18, 0x6F
 };
 IPAddress ip(192, 168, 1, 2);
 
-// Initialize the Ethernet server library
-// with the IP address and port you want to use
-// (port 80 is default for HTTP):
 EthernetServer server(80);
 
-// *** RESOURCE CONFIG ***
-#define TEMPERATURE_CODE 0
+// *** RESOURCE CONFIG **
 #define BLUETOOTH_CODE 1
-//... (max: 4 bytes -> 16 types of devices)
+#define TEMPERATURE_CODE 2
+#define LIGHT_CODE 3
+//... (max: 4 bits -> 16 types of devices)
 
 // *** Request handling ***
-String query= "";
-int queryLength = 0;
 boolean firstLine = true;
-//Request parameters
-//String requestParameters = "";
 
 //Request parts
+String query= "";
 String method = "";
 String url = "";
 String location = "";
@@ -76,9 +69,9 @@ void resetVariables(){
 }
 
 int parseRequest() {
+  int result= 0;
   int start = 0;
   int i=0;
-  int result=-1;
   //************* METHOD
   while(query[i]!=' '){
     method+=query[i];
@@ -106,25 +99,45 @@ int parseRequest() {
       if(split==1) device+=url[i];
       if(split==2) value+=url[i];
     }
-    /*query+='\0';
-    location+='\0';
-    device+='\0';
-    value+='\0';*/
   }
    
   /*
   Construct the response bit by bit (from highest to lowest level):
-      Error: 0 = no error, 1 = error
-      If error :
-        0000000 = parse error, 0100000 = method error, 1000000 = url error, 11XXXXX = other errors
-      Else :
-        Method: 00 = GET, 01 = POST, 10 = PUT, 11 = OPTIONS
-        Sensor / actuator type: 4 bits, according to the configuration
-        Value (only for POST & PUT): 0 = value not set, 1 = value set
+      0   1 2   3 4 5 6   7
+      X | X X | X X X X | X 
+      0 | method | device | value set/not set
+      Method: 00 = GET, 01 = POST, 10 = PUT, 11 = OPTIONS
+      Sensor / actuator type: 4 bits, according to the configuration
+      Value (only for POST & PUT): 0 = value not set, 1 = value set
+      
+      0   1 2 3 4 5 6 7
+      X | X X X X X X X
+      1 | error code
+      Error code: 0000000 = parse error, 0100000 = method error, 1000000 = url error, 11XXXXX = other errors
   */
-  if(String(method)=="GET") {
-    result = 0;
-    //For the moment, assume we only want temperature
+  // *** move method 5 bits ***
+  if(String(method)=="POST"){
+    result|=1<<5;
+  } else if(String(method)=="PUT") {
+    result|=2<<5;
+  } else if (String(method)=="OPTIONS"){
+    result|=3<<5;
+  } else if (String(method)!="GET"){//GET is default
+    //method error
+    result|=1<<7;
+    result|=1<<5; 
+  }
+
+  // *** move device 1 bit ***
+  if(String(device)=="light"){
+    result |=LIGHT_CODE<<1;
+  }
+  else if(String(device)=="temperature"){  
+    result |=TEMPERATURE_CODE<<1;
+  } else { 
+    //url error
+    result|=1<<7;
+    result|=2<<5; 
   }
   return result;
 }
@@ -153,7 +166,7 @@ void loop() {
         //Serial.write(c);
         //Store the first line of the query
         if(firstLine) {
-          if(c != '\n') {
+          if(c != '\n' && c!='\r') {
             query+=c;
           } else {
             firstLine = false;
@@ -171,8 +184,6 @@ void loop() {
           client.println(header);
           client.println();
           //******************************//
-          //client.println("<!DOCTYPE HTML>");
-          //client.println("<html>");
           // output the value of each analog input pin
 /*          for (int analogChannel = 0; analogChannel < 6; analogChannel++) {
             float sensorReading = getTemp(analogChannel);
@@ -182,20 +193,23 @@ void loop() {
             client.print(sensorReading);
             client.println("<br />");
           }
-*/          
-          client.print("Query: ");
-          client.println(query);
-          client.print("Request int value (-1=error): ");
-          client.println(request);
-          client.print("Method: ");
-          client.println(method);
-          client.print("location: ");
-          client.println(location);
-          client.print("device: ");
-          client.println(device);
-          client.print("Value: ");
-          client.println(value);
-          //client.println("</html>");
+*/         
+          client.println("{");
+          client.print("\"query\": \"");
+          client.println(query+"\",");
+          client.print("\"request\": ");
+          client.println(String(request)+",");
+          client.print("\"method\": \"");
+          client.println(method+"\",");
+          client.print("\"location\": \"");
+          client.println(location+"\",");
+          client.print("\"device\": \"");
+          client.println(device+"\"");
+          if(value!=""){
+            client.print(",\n\"value\":");
+            client.println(value);  
+          }
+          client.println("}");
           resetVariables();
           // close the connection:
           client.stop();
