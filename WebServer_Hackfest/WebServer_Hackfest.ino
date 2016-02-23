@@ -46,7 +46,14 @@ String device = "";
 String value = "";
 String header = "";
 
+//Request Code
+int request = 0;
+
 // *** MODEL ***
+void switchLight(boolean on){
+  if(on) digitalWrite(LIGHT_CODE, HIGH);
+  else digitalWrite(LIGHT_CODE, LOW);
+}
 float getTemp(int analog) {
   //Formula found at https://learn.adafruit.com/tmp36-temperature-sensor/using-a-temp-sensor
   return ((analogRead(analog) * 3300. / 1024.) - 500.) / 10.;
@@ -66,10 +73,10 @@ void buildResponseHeader(int HTTP){
 void resetVariables(){
   method = location = device = value = query = url = header = "";
   firstLine = true;
+  request=0;
 }
 
-int parseRequest() {
-  int result= 0;
+void parseRequest() {
   int start = 0;
   int i=0;
   //************* METHOD
@@ -117,35 +124,60 @@ int parseRequest() {
   */
   // *** move method 5 bits ***
   if(String(method)=="POST"){
-    result|=1<<5;
+    request|=1<<5;
+    if(String(value)!=""){//set value
+      request|=1;
+    }
   } else if(String(method)=="PUT") {
-    result|=2<<5;
+    request|=2<<5;
+    if(String(value)!=""){//set value
+      request|=1;
+    }
   } else if (String(method)=="OPTIONS"){
-    result|=3<<5;
+    request|=3<<5;
   } else if (String(method)!="GET"){//GET is default
     //method error
-    result|=1<<7;
-    result|=1<<5; 
+    request|=1<<7;
+    request|=1<<5; 
   }
 
   // *** move device 1 bit ***
   if(String(device)=="light"){
-    result |=LIGHT_CODE<<1;
+    request |=LIGHT_CODE<<1;
   }
   else if(String(device)=="temperature"){  
-    result |=TEMPERATURE_CODE<<1;
+    request |=TEMPERATURE_CODE<<1;
   } else { 
     //url error
-    result|=1<<7;
-    result|=2<<5; 
+    request|=1<<7;
+    request|=2<<5; 
   }
-  return result;
 }
+/*
+  Perform an operation using the request
+  EG.
+  00100111 -> POST, light 0011, value
+  */
+void performOperation(){
+  if((request>>7)!=1){// no error
+    if(((request>>5)&3)==1) { //POST
+      if((((request>>1)&15)==LIGHT_CODE) && ((request&1)==1)) {
+        if(String(value)=="on") switchLight(true);
+        if(String(value)=="off") switchLight(false);
+      }
+    } else if (((request>>5)&3)==0) {//GET
+      if((((request>>1)&15)==TEMPERATURE_CODE) && ((request&1)==0)) {
+        value=String(getTemp(A2));
+      }
+    }
+  }
+} 
 
 // *** SETUP ***
 void setup() {
   // Open serial communications and wait for port to open:
   Serial.begin(9600);
+  pinMode(LIGHT_CODE,OUTPUT);
   // start the Ethernet connection and the server:
   Ethernet.begin(mac, ip);
   server.begin();
@@ -177,8 +209,8 @@ void loop() {
         // so you can send a reply
         if (c == '\n' && currentLineIsBlank) {
           // *** Parse the first line
-          int request=parseRequest();
-          // *** sendOkHeaders(client);
+          parseRequest();
+          performOperation();
           buildResponseHeader(200);
           //header built
           client.println(header);
@@ -195,6 +227,7 @@ void loop() {
           }
 */         
           client.println("{");
+          client.println("\"@context\":\"applicationContext.jsonld\",");
           client.print("\"query\": \"");
           client.println(query+"\",");
           client.print("\"request\": ");
@@ -204,12 +237,12 @@ void loop() {
           client.print("\"location\": \"");
           client.println(location+"\",");
           client.print("\"device\": \"");
-          client.println(device+"\"");
+          client.print(device+"\"");
           if(value!=""){
             client.print(",\n\"value\":");
-            client.println(value);  
+            client.print("\""+value+"\"");  
           }
-          client.println("}");
+          client.print("\n}");
           resetVariables();
           // close the connection:
           client.stop();
