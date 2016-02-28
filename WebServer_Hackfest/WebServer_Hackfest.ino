@@ -63,7 +63,7 @@ void buildResponseHeader(int HTTP){
   if (HTTP==200){
     header =  
       "HTTP/1.1 200 OK\n"
-      "Content-Type: application/json\n"
+      "Content-Type: text/html\n"
       "Access-Control-Allow-Origin: *\n"
       "Access-Control-Allow-Methods: POST, GET, PUT, OPTIONS\n"
       "Connection: close";
@@ -224,25 +224,24 @@ void loop() {
             client.print(" is ");
             client.print(sensorReading);
             client.println("<br />");
-          }
-*/         
-          client.println("{");
-          client.println("\"@context\":\"applicationContext.jsonld\",");
-          client.print("\"query\": \"");
-          client.println(query+"\",");
-          client.print("\"request\": ");
-          client.println(String(request)+",");
-          client.print("\"method\": \"");
-          client.println(method+"\",");
-          client.print("\"location\": \"");
-          client.println(location+"\",");
-          client.print("\"device\": \"");
-          client.print(device+"\"");
-          if(value!=""){
-            client.print(",\n\"value\":");
-            client.print("\""+value+"\"");  
-          }
-          client.print("\n}");
+          }*/
+          client.print("<!DOCTYPE HTML>\n");
+          client.print("<html>\n");
+          client.print("<body>\n");
+          client.print("<script type=\"application/ld+json\">\n");
+          client.print("{\n");
+          client.print("\"@context\":\"applicationContext.jsonld\"");
+          client.print(",\n\"query\": \""+query+"\"");
+          client.print(",\n\"request\": "+String(request));
+          if(method!="") client.print(",\n\"method\": \""+method+"\"");
+          if(location!="")  client.print(",\n\"location\": \""+location+"\"");
+          if(device!="")  client.print(",\n\"device\": \""+device+"\"");
+          if(value!="")  client.print(",\n\"value\": \""+value+"\"");
+          client.println("\n}");
+          client.print("</script>\n");
+          client.print("</body>\n");
+          client.println("</html>");
+
           resetVariables();
           // close the connection:
           client.stop();

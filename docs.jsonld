@@ -1,0 +1,31 @@
+{
+  "@context": {
+    "docs": "http://myapplication.com/docs#",
+    "hydra": "http://www.w3.org/ns/hydra/core#",
+    "rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+    "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+    "temperature": {
+      "@id": ""
+    }
+  },
+  "@id": "http://myapplication.com/docs",
+  "@type": "hydra:ApiDocumentation",
+  "hydra:supportedClass": [
+    {
+      "@id": "docs:root",
+      "@type": "hydra:Class",
+      "hydra:title": "root",
+      "hydra:description": "Application Entrypoint",
+      "hydra:supportedOperation":[
+      	{
+      		"@id":"_:entry_point",
+      		"@type":"hydra:Operation",
+      		"hydra:method":"GET",
+      		"hydra:label":"API's main entry point",
+      		"hydra:expects":null,
+      		"hydra:returns":"docs:root"
+      	}
+      ]
+    }
+  ]
+}
