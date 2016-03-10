@@ -16,9 +16,13 @@
  ArduinoJson library by Benoît Blanchon
  https://github.com/bblanchon/ArduinoJson
 
+<<<<<<< 5bdeb1c6ce8b1ee1d69ea38f1ed6b11108a3e8ae
  Modification:
     Lionel Médini, June 2015
     Remy Rojas, March 2016
+=======
+ Modification: Lionel Médini, June 2015
+ Modification: Remy Rojas, March 2016
 
 */
 #include <Arduino.h>
