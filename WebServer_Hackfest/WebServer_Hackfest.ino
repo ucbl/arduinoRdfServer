@@ -16,8 +16,9 @@
  ArduinoJson library by Benoît Blanchon
  https://github.com/bblanchon/ArduinoJson
 
- Modification: Lionel Médini, June 2015
- Modification: Remy Rojas, March 2016
+ Modification: 
+    Lionel Médini, June 2015
+    Remy Rojas, March 2016
 
 */
 
@@ -30,7 +31,7 @@
 byte mac[] = {
   0x90, 0xA2, 0xDA, 0x10, 0x18, 0x6F
 };
-IPAddress ip(192, 168, 1, 2);
+IPAddress ip(10, 0, 0, 2);
 
 EthernetServer server(80);
 
@@ -85,7 +86,7 @@ void extractUrlElement(String& input, int element, String& output){
     if(slashIndex > urlEndIndex) error = true;
   }
   // Store the element, flag if invalid
-  if(error)  output = "--invalid--";
+  if(error)  output = "";
   else
   // Check whether it's the last element of the URL 
   if(input.indexOf('/', slashIndex+1) > urlEndIndex){
@@ -99,11 +100,64 @@ void extractUrlElement(String& input, int element, String& output){
   EG.
   00100111 -> POST, light 0011, value
   */
-void performOperation(String& device, String& value){
-  if(device.compareTo("lights")==0){
-    if(value.compareTo("on")==0) switchLight(true);
-    if(value.compareTo("off")==0) switchLight(false);
+JsonObject& performOperation(String& input, int method, JsonBuffer& jsonBuffer){
+  JsonObject& root = jsonBuffer.createObject();
+  // GET
+  if (method==0){
+    // Reuse an instantiated
+    // String in order to save
+    // memory space
+    String element="";
+    extractUrlElement(input, 0, element);
+    // GET /
+    if (element.compareTo("")==0){
+      root["@context"]= "__interoperability__contexts/Device";
+      root["id"]= "arduino_uno";
+      root["name"]= "Arduino Uno";
+      root["description"]= "Arduino Uno Board with 2KB memory";
+      root["capabilities"]= "/capabilities";
+    }
+    // GET /capabilities
+    if (element.compareTo("capabilities")==0){
+      extractUrlElement(input, 1, element);
+      // Now element is the second
+      // entry in the URL
+      if(element.compareTo("")==0){
+        root["@context"]= "__interoperability__contexts/Collection";
+        root["@type"]= "hydra:Collection";
+        root["@id"]= "/capabilities";
+        JsonArray& members = root.createNestedArray("members");
+          // *** list the capabilities ***
+          JsonObject& temperatureSense = members.createNestedObject();
+            temperatureSense["@id"]= "/capabilities/temperatureSense";
+            temperatureSense["@type"]= "vocab:Capability";
+      }
+      // GET /cabilities/temperatureSense
+      if (element.compareTo("temperatureSense")){
+        JsonObject& context= root.createNestedObject("@context");
+          context["vocab"]= "__interoperability__vocab#";
+          context["hydra"]= "http://www.w3.org/ns/hydra/core";
+        root["@id"]= "/capabilities/temperatureSense";
+        JsonArray& type = root.createNestedArray("@type");
+          type.add("hydra:Resource");
+          type.add("vocab:Capability");
+        root["label"]= "CapabilityTemperatureSense"
+        root["description"]= "Capability to sense temperature";
+        JsonArray& operations = root.createNestedArray("supportedOperation");
+          JsonObject& operation1 = operations.createNestedObject();
+            operation1["@id"]= "_:temperatureSense";
+            operation1["@type"]= "hydra:Operation";
+            operation1["method"]= "GET";
+            operation1["label"]= "temperatureSense";
+            operation1["description"]= "Retrieves a temperature measured by the temperature sensor";
+            operation1["expects"]= null;
+            operation1["returns"]= "vocab:Temperature";
+            JsonArray& statusCodes = operation1.createNestedArray("statusCodes");
+      }
+    }
   }
+
+  return root;
 } 
 // *** Build Header according to a status code ***
 void buildResponseHeader(EthernetClient& client, int code){
@@ -137,24 +191,16 @@ void loop() {
     String input=""; 
     if (receiveInput(client,input)) {
       int method = parseMethod(input);
-      String location = "";
-      String device = "";
-      String value = "";
-      extractUrlElement(input, 0, location);
-      extractUrlElement(input, 1, device);
-      extractUrlElement(input, 2, value);
-      
-      performOperation(device, value);
-      
-      StaticJsonBuffer<500> jsonBuffer;
-      JsonObject& root = jsonBuffer.createObject();
-      root["input"]= input;
+      // *** Response ***
+      StaticJsonBuffer<200> jsonBuffer;
+      JsonObject& root = performOperation(input, method, jsonBuffer);
+      /*root["input"]= input;
       root["method"]= method;
       JsonObject& url = root.createNestedObject("url");
-      url["location"]= location;
-      url["device"]= device;
-      url["value"]= value;
-
+        url["location"]= location;
+        url["device"]= device;
+        url["value"]= value;
+      */
       buildResponseHeader(client, 200);
       root.prettyPrintTo(client);
       delay(1);
