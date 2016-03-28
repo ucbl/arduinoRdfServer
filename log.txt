@@ -1,0 +1,6 @@
+18/03/16 - 	Subject: Solutions to early memory overflow due to Large payload/header
+		Decisions taken to work using CoAP on top of UDP instead of traditional HTTP/TCP
+		Only partial implementation aimed for 2KB ram server Endpoint (piggybacked responses and buffer recycling)
+		Once done, develop, test and integrate an HTTP/CoAP proxy
+		Further work on a fully integrated service for the AsaWoo Platform
+		
