@@ -16,7 +16,7 @@
 #include <SPI.h>         // needed for Arduino versions later than 0018
 #include <Ethernet2.h>
 #include <EthernetUdp2.h>         // UDP library from: bjoern@cs.stanford.edu 12/30/2008
-
+#include <ArduinoJson.h>
 // *** type ***
 #define CON B00000000
 #define NON B00010000
@@ -47,6 +47,7 @@ char buffer[UDP_TX_PACKET_MAX_SIZE]; //buffer to hold incoming packet
 int packetCursor=4;
 int payloadCursor=0;
 // URI-Path index and length
+int tokenLength=0;
 int uri[2]={0,0};
 int optDelta=0;
 // Request
@@ -60,7 +61,7 @@ int blockIndex=0;
 EthernetUDP Udp;
 
 void resetVariables(){
-  payloadStartIndex=uri[0]=uri[1]=blockIndex=optDelta=0;
+  payloadStartIndex=uri[0]=uri[1]=blockIndex=optDelta=tokenLength=0;
   memset(buffer,0,UDP_TX_PACKET_MAX_SIZE);
   packetCursor=4;
 }
@@ -115,8 +116,10 @@ void readPayload(){
 void parseHeader(){
   // *** store packet into buffer ***
   Udp.read(buffer, UDP_TX_PACKET_MAX_SIZE);
+  tokenLength=(15&buffer[0]);
+  packetCursor+=tokenLength;
   // *** check and read options ***
-  if((buffer[4]!=PAYLOAD_START) && (buffer[4]!=EMPTY)){
+  if((buffer[packetCursor]!=PAYLOAD_START) && (buffer[packetCursor]!=EMPTY)){
     boolean options = true;
     while(options){
       options = readOptionDesc();
@@ -132,26 +135,25 @@ void parseHeader(){
 void writeHeader(int type, int block, int code, int blockNum){
   writeType(type);
   writeCode(code);
-  packetCursor = 4;
+  packetCursor = 4+tokenLength;
   
-  // copy the block option into the response
   if (block>0){
-    packetCursor=7;
     // 13 | length 1
-    buffer[4]=B11010001;
+    buffer[packetCursor]=B11010001;
     // delta extended 23 or 27
     if (block==1) {
-      buffer[5]=B00001110;
-      buffer[6]=B00000000|(blockNum<<4);
+      buffer[packetCursor+1]=B00001110;
+      buffer[packetCursor+2]=B00000000|(blockNum<<4);
     }
     if (block==2) {
-      buffer[5]=B00001010;
+      buffer[packetCursor+1]=B00001010;
       // check if payload needs
       // more blocks
       int more=1;
       if(blockNum>=payload.length()/16) more=0;
-      buffer[6]=B00000000|(more*M)|(blockNum<<4);
+      buffer[packetCursor+2]=B00000000|(more*M)|(blockNum<<4);
     }
+    packetCursor+=3;
   }
 }
 

@@ -141,7 +141,7 @@ JsonObject& performOperation(String& input, int method, JsonBuffer& jsonBuffer){
         JsonArray& type = root.createNestedArray("@type");
           type.add("hydra:Resource");
           type.add("vocab:Capability");
-        root["label"]= "CapabilityTemperatureSense"
+        root["label"]= "CapabilityTemperatureSense";
         root["description"]= "Capability to sense temperature";
         JsonArray& operations = root.createNestedArray("supportedOperation");
           JsonObject& operation1 = operations.createNestedObject();
@@ -150,7 +150,7 @@ JsonObject& performOperation(String& input, int method, JsonBuffer& jsonBuffer){
             operation1["method"]= "GET";
             operation1["label"]= "temperatureSense";
             operation1["description"]= "Retrieves a temperature measured by the temperature sensor";
-            operation1["expects"]= null;
+            operation1["expects"]= "";
             operation1["returns"]= "vocab:Temperature";
             JsonArray& statusCodes = operation1.createNestedArray("statusCodes");
       }
