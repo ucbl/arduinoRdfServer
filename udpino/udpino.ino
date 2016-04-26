@@ -1,26 +1,12 @@
-/*
-  UDPSendReceive.pde:
- This sketch receives UDP message strings, prints them to the serial port
- and sends an "acknowledge" string back to the sender
-
- A Processing sketch is included at the end of file that can be used to send
- and received messages for testing with a computer.
-
- created 21 Aug 2010
- by Michael Margolis
-
- This code is in the public domain.
- */
-
-
 #include <SPI.h>         // needed for Arduino versions later than 0018
 #include <Ethernet2.h>
 #include <EthernetUdp2.h>         // UDP library from: bjoern@cs.stanford.edu 12/30/2008
-#include <ArduinoJson.h>
+#include <avr/pgmspace.h>
+#include <EEPROM.h>
 // *** type ***
+#define ACK B00100000
 #define CON B00000000
 #define NON B00010000
-#define ACK B00100000
 // *** code ***
 #define EMPTY B00000000
 #define VALID B01000011
@@ -30,38 +16,81 @@
 #define CONTENT B01000101 //only for GET
 #define PAYLOAD_START B11111111
 #define M B00001000
-#define PAYLOAD_MAX_SIZE 16
+#define PAYLOAD_MAX_SIZE 64
 
+//////////////////////////////////////////////////////////////
+// CAPABILITIES
+//////////////////////////////////////////////////////////////
+
+const char CAPABILITIES[] PROGMEM = 
+  //"{"
+    "{"
+      "\"@id\": \"vocab:CapabilityTemperatureSense\","
+      "\"@type\": [\"hydra:Resource\", \"vocab:Capability\"],"
+      "\"subClassOf\": null,"
+      "\"label\": \"CapabilityTemperatureSense\","
+      "\"description\": \"Capability that queries a temperature sensor\","
+      "\"supportedOperation\": ["
+        "{"
+          "\"@id\": \"_:temperatureSense\","
+          "\"@type\": \"hydra:Operation\","
+          "\"method\": \"GET\","
+          "\"label\": \"temperatureSense\","
+          "\"description\": \"Retrieves a temperature measured by the temperature sensor\","
+          "\"expects\": null,"
+          "\"returns\": \"vocab:Temperature\","
+          "\"statusCodes\": []"
+        "}"
+      "]"
+    "}\0";
+  //"}\0";
 // Enter a MAC address and IP address for your controller below.
 // The IP address will be dependent on your local network:
+
 byte mac[] = {
   0x90, 0xA2, 0xDA, 0x10, 0x18, 0x6F
 };
 IPAddress ip(10, 0, 0, 2);
 
-unsigned int localPort = 5683;      // local port to listen on
+unsigned int localPort = 5683;      // local port to listen o
 
-// *** #define UDP_TX_PACKET_MAX_SIZE 32 ***
+//////////////////////////////////////////////////////////////
+// COAP
+//////////////////////////////////////////////////////////////
+// *** #define UDP_TX_PACKET_MAX_SIZE 80 ***
 // buffers for receiving and sending data
 char buffer[UDP_TX_PACKET_MAX_SIZE]; //buffer to hold incoming packet
 int packetCursor=4;
 int payloadCursor=0;
+// uri and payload correspondance
+typedef struct{
+  String path;
+  const char* const_payload;
+} uripayload_t;
+
+uripayload_t uripayload[5];
 // URI-Path index and length
 int tokenLength=0;
 int uri[2]={0,0};
+String path="/";
 int optDelta=0;
 // Request
 int method=0;
 int payloadStartIndex=0;
 String request="";
-String payload="my little pony 1 my little pony 2 my little pony 3 my little pony 4";
+int const_payload_index=-1;
+int payloadLen = 0;
 // Blocks
 int blockIndex=0;
 // An EthernetUDP instance to let us send and receive packets over UDP
 EthernetUDP Udp;
 
+//////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////
+
 void resetVariables(){
   payloadStartIndex=uri[0]=uri[1]=blockIndex=optDelta=tokenLength=0;
+
   memset(buffer,0,UDP_TX_PACKET_MAX_SIZE);
   packetCursor=4;
 }
@@ -132,7 +161,7 @@ void parseHeader(){
   method = int(buffer[1]);
 }
 
-void writeHeader(int type, int block, int code, int blockNum){
+void writeHeader(int type, int block, int code, int blockNum, int payloadLength){
   writeType(type);
   writeCode(code);
   packetCursor = 4+tokenLength;
@@ -150,26 +179,39 @@ void writeHeader(int type, int block, int code, int blockNum){
       // check if payload needs
       // more blocks
       int more=1;
-      if(blockNum>=payload.length()/16) more=0;
-      buffer[packetCursor+2]=B00000000|(more*M)|(blockNum<<4);
+      if(blockNum>=payloadLength/PAYLOAD_MAX_SIZE) more=0;
+      buffer[packetCursor+2]=B00000010|(more*M)|(blockNum<<4);
     }
     packetCursor+=3;
   }
 }
 
-void writePayload(){
+int getPayloadLength(const char* payloadIndex){
+  int len =0;
+  while(pgm_read_byte(payloadIndex)!='\0'){
+    len++;
+    payloadIndex++;
+  }
+  return len;
+}
+
+void writePayload(const char* payloadStartIndex, int payloadLength){
   buffer[packetCursor]=PAYLOAD_START;
   packetCursor++;
   //Serial.print("plcursor: ");
   //Serial.println(payloadCursor);
   for (int i=0;i<PAYLOAD_MAX_SIZE;i++){
-    if((packetCursor<UDP_TX_PACKET_MAX_SIZE && payloadCursor<payload.length())){
-      buffer[packetCursor]=payload[payloadCursor];
+    if((packetCursor<UDP_TX_PACKET_MAX_SIZE && payloadCursor<payloadLength)){
+      buffer[packetCursor]=pgm_read_byte(payloadStartIndex+payloadCursor);
       packetCursor++;
       payloadCursor++;
     }
   }
-  if(payloadCursor>=payload.length()) payloadCursor=0;
+  //once the last block is written
+  if(payloadCursor>=payloadLength) {
+    payloadCursor=payloadLen=0;
+    const_payload_index = -1;
+  } 
 }
 
 int analyzeBlock(){
@@ -181,11 +223,28 @@ int analyzeBlock(){
   return blockValue;
 }
 
+//////////////////////////////////////////////////////////////
+// APP LEVEL
+//////////////////////////////////////////////////////////////
+
+int getUriPayload(){
+  //uri[0] = uri start index in buffer[]
+  // uri[1] = uri length
+  for (int i=0; i<uri[1]; i++) 
+    path+=buffer[uri[0]+i];
+  for (int i=0; i<10; i++)
+    if (path.equals(uripayload[i].path))
+      return i;
+  return -1;
+}
+
 void setup() {
   // start the Ethernet and UDP:
   Ethernet.begin(mac, ip);
   Udp.begin(localPort);
   Serial.begin(9600);
+  uripayload[0].path="/";
+  uripayload[0].const_payload=CAPABILITIES;
 }
 
 void loop() {
@@ -195,27 +254,35 @@ void loop() {
   {
     parseHeader();
     int blockValue=analyzeBlock();
-    //Serial.print("blockValue: ");
-    //Serial.println(blockValue,BIN);
-    if(((255&blockValue)>>4)==0) request="";
+    // if it's the first block
+    if(((255&blockValue)>>4)==0){
+      // *** GET ***
+      // get the payload index in progmem
+      // for current request
+      const_payload_index = getUriPayload();
+      payloadLen = getPayloadLength(uripayload[const_payload_index].const_payload);
+      // *** POST ***
+      // incoming request payload
+      request="";
+    }
     // *** read payload if any ***
     readPayload();
+    // *** treat GET with block2 ***
+    // no payload in the request!    
+    if(method==1) {
+      // get the payload for the current uri
+      writeHeader(ACK,2, VALID,(255&blockValue)>>4, payloadLen);
+      writePayload(uripayload[const_payload_index].const_payload, payloadLen);  
+    
+    }
     // *** treat POST with block1 ***
     // payload in the request
-    if(method==2) {
-      writeHeader(NON,1, CHANGED,(255&blockValue)>>4);
-      //if no more blocks
+    if(method==2) {  
+      writeHeader(ACK,1, CHANGED,(255&blockValue)>>4, 0);
       if((blockValue&M)==0){
+        // Do something with the received payload
         Serial.println(request);
       }
-    }
-    // *** treat GET with block2 ***
-    // no payload in the request!
-    if(method==1) {
-      //Serial.print("pl length: ");
-      //Serial.println(payload.length());
-      writeHeader(NON,2, VALID,(255&blockValue)>>4);
-      writePayload();
     }
     //Serial.print("bytes sent: ");
     //Serial.println(packetCursor);
