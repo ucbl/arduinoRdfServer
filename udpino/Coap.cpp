@@ -4,6 +4,7 @@
 Coap::Coap(char* payloadBuffer){
   buffer = payloadBuffer;
   payloadCursor=0;
+  request="";
   resetVariables();
 }
 
@@ -135,17 +136,19 @@ void Coap::writeHeader(int type, int block, int code, int blockNum, int payloadL
   if(block==1) writeOption(27,1,content2);
 }
 
-
-void Coap::writePayload(const char* payloadStartIndex_w, int payloadLength){
+void Coap::writePayload(const char* payloadStartIndex_w, int payloadLength, char variable){
   buffer[packetCursor]=PAYLOAD_START;
   packetCursor++;
+  //payloadCursor reads from PROGMEM
+  //packetCursor writes on buffer
   int i=0;
   while (packetCursor<UDP_TX_PACKET_MAX_SIZE && payloadCursor<payloadLength && i<PAYLOAD_MAX_SIZE){
     if(pgm_read_byte(payloadStartIndex_w+payloadCursor)=='#'){
       //TODO:
       // replace '#' by something else
-      buffer[packetCursor]='N';
+      buffer[packetCursor]=variable;
       payloadCursor++;
+      variable_cursor++;
     } else {
       buffer[packetCursor]=pgm_read_byte(payloadStartIndex_w+payloadCursor);
       payloadCursor++;
@@ -155,8 +158,7 @@ void Coap::writePayload(const char* payloadStartIndex_w, int payloadLength){
   }
   //once the last block of payload is written
   if(payloadCursor>=payloadLength) {
-    Serial.println("this happened");
-    payloadCursor = payloadLen = 0;
+    payloadCursor = payloadLen = variable_cursor= 0;
     const_payload_index = -1;
   }
 }

@@ -3,25 +3,10 @@
 #include <SPI.h>         // needed for Arduino versions later than 0018
 #include <Ethernet2.h>
 #include <EthernetUdp2.h>         // UDP library from: bjoern@cs.stanford.edu 12/30/2008
-#include "Semantic.h"
-//#include <EEPROM.h>
+#include <EEPROM.h>
 #include "Coap.h"
 #include "Semantic.h"
-// *** type ***
-#define ACK B00100000
-#define CON B00000000
-#define NON B00010000
-// *** code ***
-#define EMPTY B00000000
-#define VALID B01000011
-#define CREATED B01000001 //only for POST-PUT
-#define DELETED B01000010 //only for POST-PUT
-#define CHANGED B01000100
-#define CONTENT B01000101 //only for GET
-#define PAYLOAD_START B11111111
-#define M B00001000
-#define PAYLOAD_MAX_SIZE 64
-#define OPT_DELTA_EXTENDED B11010000
+#include "EepromManager.h"
 
 //////////////////////////////////////////////////////////////
 // CAPABILITIES
@@ -48,20 +33,13 @@ int const_payload_index=-1;
 int payloadLen = 0;
 // Blocks
 
-//////////////////////////////////////////////////////////////
-// EEPROM
-//////////////////////////////////////////////////////////////
-#define temperature_eeprom_index 0
-
 
 //////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////
 // An EthernetUDP instance to let us send and receive packets over UDP
 EthernetUDP Udp;
 Coap coap= Coap(buffer);
-
-
-
+EepromManager epm;
 //////////////////////////////////////////////////////////////
 // APP LEVEL
 //////////////////////////////////////////////////////////////
@@ -81,16 +59,29 @@ int getUriPayload(int* uri){
   //uri[0] = uri start index in buffer[]
   // uri[1] = uri length
   // if there's no specified path
-  Serial.println(uri[1]);
   if(uri[1]==0) path="/";
   else // read the path from the header
     for (int i=0; i<uri[1]; i++)
       path+=buffer[uri[0]+i];
   // check if the path corresponds to a PROGMEM payload
-  for (int i=0; i<10; i++)
+  for (int i=0; i<sizeof(uripayloads); i++)
     if (path.equals(uripayloads[i].path))
       return i;
-  return -1;
+  // otherwise return -1
+  return 0;
+}
+
+
+// *** Reads the physical ressource for a given Pin ***
+char getVariables(){
+  for (int i=0;i<epm.ressource_count; i++){
+    if(path.compareTo(String(epm.ressources[i].uri))==0){
+      Serial.println(F("Request matches a Ressource!"));
+      return char(int(analogRead(epm.ressources[i].pin)));
+    }
+  }
+  Serial.println(F("Request did not match any Ressource :("));
+  return 'N';
 }
 
 void setup() {
@@ -99,12 +90,21 @@ void setup() {
   Udp.begin(localPort);
   Serial.begin(9600);
   // assignment of uris to the corresponding payloads
-  uripayloads[0].path="/";
-  uripayloads[0].const_payload=CAPABILITIES;
-  uripayloads[0].variables=0;
-  uripayloads[1].path="/temperature";
-  uripayloads[1].const_payload=TEMPERATURE;
-  uripayloads[1].variables=2;
+  uripayloads[0].path="/error";
+  uripayloads[0].const_payload=ERROR;
+  uripayloads[1].path="/";
+  uripayloads[1].const_payload=CAPABILITIES;
+  uripayloads[2].path="/temperature";
+  uripayloads[2].const_payload=TEMPERATURE;
+  epm.resetMemory();
+  epm.initialize();
+  epm.addRessource(3,"/temperature");
+  /*epm.initialize();
+  epm.addRessource(1,"light");
+  epm.initialize();*/
+  epm.setPin(2, "/temperature");
+  epm.printRessources();
+
 }
 
 void loop() {
@@ -115,7 +115,6 @@ void loop() {
     //load the buffer with the incomming request
     Udp.read(buffer, UDP_TX_PACKET_MAX_SIZE);
     int blockValue = coap.parseHeader();
-    Serial.println(blockValue);
     // if it's the first block
     if(((255&blockValue)>>4)==0){
       //TODO: Parse the URI to know what to do with it
@@ -123,17 +122,16 @@ void loop() {
       // for current request
       const_payload_index = getUriPayload(coap.uri);
       payloadLen = getPayloadLength_P(uripayloads[const_payload_index].const_payload);
-      coap.request="";
     }
-    // *** NEVER DO THIS ***
-    //Serial.println(uripayloads[const_payload_index].path);
+    Serial.println(uripayloads[const_payload_index].path);
     coap.readPayload();
     // *** treat GET with block2 ***
     // no payload in the request!
     if(coap.method==1) {
       // get the payload for the current uri
       coap.writeHeader(ACK,2, VALID,(255&blockValue)>>4, payloadLen);
-      coap.writePayload(uripayloads[const_payload_index].const_payload, payloadLen);
+      char variable = getVariables();
+      coap.writePayload(uripayloads[const_payload_index].const_payload, payloadLen, variable);
     }
     // *** treat POST with block1 ***
     // payload in the request
@@ -143,6 +141,7 @@ void loop() {
         // TODO:
         // Do something with the received payload
         Serial.println(coap.request);
+        coap.request="";
       }
       coap.writeHeader(ACK,1, CHANGED,(255&blockValue)>>4, 0);
     }

@@ -1,1 +1,8 @@
 node_modules
+udpino/lib
+udpino/.*
+udpino/platformio.ini
+WebServer_Hackfest/lib
+WebServer_Hackfest/.*
+WebServer_Hackfest/platformio.ini
+interoperability.jsonld

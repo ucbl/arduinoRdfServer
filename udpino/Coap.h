@@ -19,6 +19,7 @@
 #define PAYLOAD_START B11111111
 #define M B00001000
 #define PAYLOAD_MAX_SIZE 64
+#define OPT_DELTA_EXTENDED B11010000
 
 class Coap
 {
@@ -42,12 +43,12 @@ class Coap
     int blockIndex;
     void sendBuffer(EthernetUDP Udp, int sendSize);
     void writeHeader(int type, int block, int code, int blockNum, int payloadLength);
-    void writePayload(const char* payloadStartIndex, int payloadLength);
+    void writePayload(const char* payloadStartIndex, int payloadLength, char variable);
     void readPayload();
     void resetVariables();
   private:
+    int variable_cursor;
     char* buffer;
-    EthernetUDP Udp;
     void writeOption(int optNum, int len, char* content);
     boolean readOptionDesc();
     void writeCode(char code);

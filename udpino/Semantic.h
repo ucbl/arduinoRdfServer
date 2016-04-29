@@ -7,14 +7,13 @@
 typedef struct{
   String path;
   const char* const_payload;
-  byte variables;
-  int eeprom_port_index;
-  int eeprom_uri_index;
 } uripayload_t;
+
+const char ERROR[] PROGMEM = "Unknown URI";
 
 const char CAPABILITIES[] PROGMEM =
   "{"
-    "\"@context\": \"THECONTEXT\","
+    "\"@context\": \"#context#\","
     "\"@id\": \"/\","
     "\"@type\": \"hydra:EntryPoint\","
     "\"capabilities\": ["
@@ -34,6 +33,16 @@ const char CAPABILITIES[] PROGMEM =
             "\"expects\": null,"
             "\"returns\": \"vocab:Temperature\","
             "\"statusCodes\": []"
+          "},"
+          "{"
+            "\"@id\": \"_:changePin\","
+            "\"@type\": \"hydra:Operation\","
+            "\"method\": \"POST\","
+            "\"label\": \"temperatureSense\","
+            "\"description\": \"Changes the Pin to look for the temperature\","
+            "\"expects\": \"int\","
+            "\"returns\": null,"
+            "\"statusCodes\": []"
           "}"
         "]"
       "}"
@@ -46,8 +55,8 @@ const char TEMPERATURE[] PROGMEM=
     "\"@context\": \"APICONTEXT\","
     "\"@id\": \"/temperature\","
     "\"@type\": \"Temperature\","
-    "\"value\": null,"
-    "\"type\": \"#\""
+    "\"value\": #,"
+    "\"type\": \"°C\""
   "}\0"
 ;
 
