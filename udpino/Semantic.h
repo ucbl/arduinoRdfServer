@@ -4,12 +4,6 @@
 #include <Arduino.h>
 #include <avr/pgmspace.h>
 
-
-typedef struct{
-  String path;
-  const char* const_payload;
-} uripayload_t;
-
 const char ERROR[] PROGMEM = "Unknown URI";
 
 const char CAPABILITIES[] PROGMEM =

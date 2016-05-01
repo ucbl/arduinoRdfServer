@@ -16,7 +16,6 @@ void Coap::resetVariables(){
   blockIndex=
   optDelta=
   tokenLength=0;
-  path="";
   memset(buffer,0,UDP_TX_PACKET_MAX_SIZE);
 }
 
@@ -44,19 +43,25 @@ boolean Coap::readOptionDesc(){
   // 11: URI-Path
   if(int(optNumber)==11){
     uri[0]=packetCursor+1;
+    if(int(optLength)==13){
+      optLength+=int(255&buffer[packetCursor+1]);
+      packetCursor++;
+      uri[0]++;
+    }
     uri[1]=optLength;
   }
   // *** if BLOCK ***
   // attribute an index to blockIndex
   if(optNumber==23 || optNumber==27) {
     blockIndex=packetCursor;
+    if(((255&buffer[packetCursor])>>4)==13){
+      packetCursor++;
+    }
   }
 
   // 13:  An 8-bit unsigned integer follows the initial byte and
   // indicates the Option Delta minus 13.
-  if(((255&buffer[packetCursor])>>4)==13){
-    packetCursor++;
-  }
+
 
   packetCursor+=int(optLength)+1;
   optDelta=optNumber;
@@ -74,6 +79,7 @@ void Coap::readPayload(){
 
 int Coap::parseHeader(){
   // *** store packet into buffer ***
+  // tkl offset
   tokenLength=(15&buffer[0]);
   packetCursor=4+tokenLength;
   // check and read options
@@ -136,29 +142,31 @@ void Coap::writeHeader(int type, int block, int code, int blockNum, int payloadL
   if(block==1) writeOption(27,1,content2);
 }
 
-void Coap::writePayload(const char* payloadStartIndex_w, int payloadLength, char variable){
+void Coap::writePayload(const char* payloadStartIndex_w, int payloadLength, String data){
   buffer[packetCursor]=PAYLOAD_START;
   packetCursor++;
   //payloadCursor reads from PROGMEM
   //packetCursor writes on buffer
-  int i=0;
+  uint8_t variable_cursor= 0;
+  uint8_t i=0;
+  char write_char;
   while (packetCursor<UDP_TX_PACKET_MAX_SIZE && payloadCursor<payloadLength && i<PAYLOAD_MAX_SIZE){
-    if(pgm_read_byte(payloadStartIndex_w+payloadCursor)=='#'){
-      //TODO:
-      // replace '#' by something else
-      buffer[packetCursor]=variable;
-      payloadCursor++;
-      variable_cursor++;
+    write_char = pgm_read_byte(payloadStartIndex_w+payloadCursor);
+    if(write_char=='#' && data!=nullptr){
+      for(uint8_t j=0;j<data.length();j++){
+        buffer[packetCursor]=data[j];
+        variable_cursor++;
+        packetCursor++;
+      }
     } else {
-      buffer[packetCursor]=pgm_read_byte(payloadStartIndex_w+payloadCursor);
-      payloadCursor++;
+      buffer[packetCursor]=write_char;
     }
+    payloadCursor++;
     packetCursor++;
     i++;
   }
   //once the last block of payload is written
   if(payloadCursor>=payloadLength) {
-    payloadCursor = payloadLen = variable_cursor= 0;
-    const_payload_index = -1;
+    payloadCursor = 0;
   }
 }

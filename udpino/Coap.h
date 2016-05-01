@@ -26,29 +26,24 @@ class Coap
   public:
     Coap(char* payloadBuffer);
     int parseHeader();
-
     int packetCursor;
     int payloadCursor;
     int tokenLength;
     int uri[2];
-    String path;
     int optDelta;
     // Request
     int method;
     int payloadStartIndex_r;
     String request;
-    int const_payload_index;
-    int payloadLen;
     // Blocks
     int blockIndex;
     void sendBuffer(EthernetUDP Udp, int sendSize);
     void writeHeader(int type, int block, int code, int blockNum, int payloadLength);
-    void writePayload(const char* payloadStartIndex, int payloadLength, char variable);
+    void writePayload(const char* payloadStartIndex, int payloadLength, String data);
     void readPayload();
     void resetVariables();
-  private:
-    int variable_cursor;
     char* buffer;
+  private:
     void writeOption(int optNum, int len, char* content);
     boolean readOptionDesc();
     void writeCode(char code);

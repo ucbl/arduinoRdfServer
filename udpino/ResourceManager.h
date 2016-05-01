@@ -6,36 +6,40 @@
 #include <ArduinoJson.h>
 
 #include "Semantic.h"
-#define EEPROM_RESOURCE_ALLOC_SIZE 20
-#define EEPROM_RESOURCE_NUM 6
+#define EEPROM_RESOURCE_ALLOC_SIZE 15
+#define EEPROM_RESOURCE_NUM 3
+
+struct resource_t{
+  const char* json;
+  uint8_t pin;
+  char id[EEPROM_RESOURCE_ALLOC_SIZE];
+};
+struct operation_t{
+  char uri[EEPROM_RESOURCE_ALLOC_SIZE];
+  uint8_t method;
+  int expects_index;
+  int returns_index;
+};
 
 class ResourceManager{
   public:
     ResourceManager();
-    const char* capabilities_json;
-    struct operation_t{
-      char uri[EEPROM_RESOURCE_ALLOC_SIZE];
-      int method;
-      ressource_t expects;
-      ressource_t returns;
-    }
-    struct resource_t{
-      const char* resource_json;
-      uint8_t pin;
-      char uri[EEPROM_RESOURCE_ALLOC_SIZE];
-    };
     operation_t operations[EEPROM_RESOURCE_NUM];
     resource_t resources[EEPROM_RESOURCE_NUM];
     unsigned int resource_count;
+    unsigned int operation_count;
     void initialize();
-    void addResource(uint8_t pin, char* uri);
+    void addResource(uint8_t pin, char* id, const char* json);
+    void addOperation(char * uri, uint8_t method, int expects_index, int returns_index);
     void resetMemory();
     void printResources();
-    void setPin(uint8_t pin, char* uri);
+    void printOperations();
+    void setPin(uint8_t pin, char* id);
     void parseCapabilities(const char* capabilities);
+    int uriInUse(char* uri);
+    int idInUse(char* id);
   private:
     int last_index;
-    boolean uriInUse(char* uri);
     boolean pinInUse(byte pin);
 };
 #endif
