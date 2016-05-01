@@ -5,13 +5,9 @@
 #include <EthernetUdp2.h>         // UDP library from: bjoern@cs.stanford.edu 12/30/2008
 #include <EEPROM.h>
 #include "Coap.h"
+#include "JsonParser.h"
 #include "Semantic.h"
-#include "EepromManager.h"
-
-//////////////////////////////////////////////////////////////
-// CAPABILITIES
-//////////////////////////////////////////////////////////////
-
+#include "ResourceManager.h"
 
 // Enter a MAC address and IP address for your controller below.
 // The IP address will be dependent on your local network:
@@ -27,11 +23,9 @@ char buffer[UDP_TX_PACKET_MAX_SIZE];
 // uri and payload correspondance
 uripayload_t uripayloads[5];
 // URI-Path index and length
-String path="/";
 // Request
 int const_payload_index=-1;
 int payloadLen = 0;
-// Blocks
 
 
 //////////////////////////////////////////////////////////////
@@ -39,7 +33,8 @@ int payloadLen = 0;
 // An EthernetUDP instance to let us send and receive packets over UDP
 EthernetUDP Udp;
 Coap coap= Coap(buffer);
-EepromManager epm;
+ResourceManager rsm;
+
 //////////////////////////////////////////////////////////////
 // APP LEVEL
 //////////////////////////////////////////////////////////////
@@ -55,32 +50,33 @@ int getPayloadLength_P(const char* payloadIndex){
 
 // if the URI corresponds to a unique static payload
 // returns the index of such struct uripayload_t
-int getUriPayload(int* uri){
-  //uri[0] = uri start index in buffer[]
-  // uri[1] = uri length
-  // if there's no specified path
-  if(uri[1]==0) path="/";
-  else // read the path from the header
-    for (int i=0; i<uri[1]; i++)
-      path+=buffer[uri[0]+i];
-  // check if the path corresponds to a PROGMEM payload
+char* getUriPayload(int uri[2]){
+  int uri_start_index = uri[0];
+  int uri_length = uri[1];
+
+  if(uri_length==0) return "/";
+  char path[uri_length];
+   // read the path from the header
+  for (int i=0; i<uri_length; i++)
+    path[uri_start_index+i]=buffer[uri_start_index + i];
+  // TODO: refactor this to use a variable referencing resources in progmem
   for (int i=0; i<sizeof(uripayloads); i++)
-    if (path.equals(uripayloads[i].path))
-      return i;
+    if (uripayloads[i].path.compareTo(String(path))==0)
+      return path;
   // otherwise return -1
-  return 0;
+  return "error";
 }
 
 
-// *** Reads the physical ressource for a given Pin ***
-char getVariables(){
-  for (int i=0;i<epm.ressource_count; i++){
-    if(path.compareTo(String(epm.ressources[i].uri))==0){
-      Serial.println(F("Request matches a Ressource!"));
-      return char(int(analogRead(epm.ressources[i].pin)));
+// *** Reads the physical resource for a given Pin ***
+char getVariables(String path){
+  for (int i=0;i<rsm.resource_count; i++){
+    if(path.compareTo(String(rsm.resources[i].uri))==0){
+      Serial.println(F("Request matches a Resource!"));
+      return char(int(analogRead(rsm.resources[i].pin)));
     }
   }
-  Serial.println(F("Request did not match any Ressource :("));
+  Serial.println(F("Request did not match any Resource :("));
   return 'N';
 }
 
@@ -90,20 +86,20 @@ void setup() {
   Udp.begin(localPort);
   Serial.begin(9600);
   // assignment of uris to the corresponding payloads
+  //TODO: generate JSON-path-resource relationships based on JSON parsing
   uripayloads[0].path="/error";
   uripayloads[0].const_payload=ERROR;
   uripayloads[1].path="/";
   uripayloads[1].const_payload=CAPABILITIES;
-  uripayloads[2].path="/temperature";
+  uripayloads[2].path="/temperatureSense";
   uripayloads[2].const_payload=TEMPERATURE;
-  epm.resetMemory();
-  epm.initialize();
-  epm.addRessource(3,"/temperature");
-  /*epm.initialize();
-  epm.addRessource(1,"light");
-  epm.initialize();*/
-  epm.setPin(2, "/temperature");
-  epm.printRessources();
+  //rsm.resetMemory();
+  rsm.initialize();
+  rsm.addResource(3,"/temperatureSense");
+  //rsm.initialize();
+  //rsm.setPin(0xA2, "/temperatureSense");
+  rsm.printResources();
+  rsm.parseCapabilities(CAPABILITIES);
 
 }
 
@@ -120,7 +116,7 @@ void loop() {
       //TODO: Parse the URI to know what to do with it
       // get the payload index in progmem
       // for current request
-      const_payload_index = getUriPayload(coap.uri);
+      char* path = getUriPayload(coap.uri);
       payloadLen = getPayloadLength_P(uripayloads[const_payload_index].const_payload);
     }
     Serial.println(uripayloads[const_payload_index].path);
@@ -130,7 +126,7 @@ void loop() {
     if(coap.method==1) {
       // get the payload for the current uri
       coap.writeHeader(ACK,2, VALID,(255&blockValue)>>4, payloadLen);
-      char variable = getVariables();
+      char variable = getVariables(uripayloads[const_payload_index].path);
       coap.writePayload(uripayloads[const_payload_index].const_payload, payloadLen, variable);
     }
     // *** treat POST with block1 ***

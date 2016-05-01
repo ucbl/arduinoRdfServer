@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include <avr/pgmspace.h>
 
+
 typedef struct{
   String path;
   const char* const_payload;
@@ -29,20 +30,20 @@ const char CAPABILITIES[] PROGMEM =
             "\"@type\": \"hydra:Operation\","
             "\"method\": \"GET\","
             "\"label\": \"temperatureSense\","
-            "\"description\": \"Retrieves a temperature measured by the temperature sensor\","
+            //"\"description\": \"Retrieves a temperature measured by the temperature sensor\","
             "\"expects\": null,"
-            "\"returns\": \"vocab:Temperature\","
-            "\"statusCodes\": []"
+            "\"returns\": \"vocab:Temperature\""
+            //"\"statusCodes\": []"
           "},"
           "{"
             "\"@id\": \"_:changePin\","
             "\"@type\": \"hydra:Operation\","
             "\"method\": \"POST\","
             "\"label\": \"temperatureSense\","
-            "\"description\": \"Changes the Pin to look for the temperature\","
+            //"\"description\": \"Changes the Pin to look for the temperature\","
             "\"expects\": \"int\","
-            "\"returns\": null,"
-            "\"statusCodes\": []"
+            "\"returns\": null"
+            //"\"statusCodes\": []"
           "}"
         "]"
       "}"
@@ -53,7 +54,7 @@ const char CAPABILITIES[] PROGMEM =
 const char TEMPERATURE[] PROGMEM=
   "{"
     "\"@context\": \"APICONTEXT\","
-    "\"@id\": \"/temperature\","
+    "\"@id\": \"/temperatureSense\","
     "\"@type\": \"Temperature\","
     "\"value\": #,"
     "\"type\": \"°C\""
