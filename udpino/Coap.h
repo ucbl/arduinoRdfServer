@@ -2,6 +2,7 @@
 #define Coap_h
 
 #include <Arduino.h>
+#include <ArduinoJson.h>
 #include <EthernetUdp2.h>
 
 // *** type ***
@@ -31,10 +32,12 @@ class Coap
     int tokenLength;
     int uri[2];
     int optDelta;
+    uint8_t payload_depth;
+    uint8_t max_payload_depth;
     // Request
-    int method;
+    uint8_t method;
     int payloadStartIndex_r;
-    String request;
+    String payload_chunk;
     // Blocks
     int blockIndex;
     void sendBuffer(EthernetUDP Udp, int sendSize);
@@ -44,6 +47,7 @@ class Coap
     void resetVariables();
     char* buffer;
   private:
+    void parseChunk(boolean new_object);
     void writeOption(int optNum, int len, char* content);
     boolean readOptionDesc();
     void writeCode(char code);

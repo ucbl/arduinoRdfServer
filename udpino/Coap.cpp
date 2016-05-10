@@ -4,7 +4,9 @@
 Coap::Coap(char* payloadBuffer){
   buffer = payloadBuffer;
   payloadCursor=0;
-  request="";
+  payload_chunk="{";
+  payload_depth=0;
+  max_payload_depth=0;
   resetVariables();
 }
 
@@ -71,10 +73,46 @@ boolean Coap::readOptionDesc(){
 }
 
 void Coap::readPayload(){
-  if (payloadStartIndex_r!=0)
-    for(int i=payloadStartIndex_r;i<UDP_TX_PACKET_MAX_SIZE;i++)
-      if(buffer[i]!=EMPTY)
-        request+=buffer[i];
+  //initialize max payload depth at the beginning of the payload only
+  if(payload_depth==0) max_payload_depth=0;
+  if (payloadStartIndex_r!=0){
+    int i=payloadStartIndex_r;
+    while(i<UDP_TX_PACKET_MAX_SIZE && buffer[i]!=EMPTY){
+      //if a new { opens, parse what was left behind at the same level
+      if(buffer[i]=='{') {
+        if(payload_depth+1>max_payload_depth) max_payload_depth=payload_depth+1;
+        if(payload_depth!=0) parseChunk(true);
+        payload_depth++;
+      }
+      //if a } closes parse what was left behind at the same level
+      else if(buffer[i]=='}') {
+        if(payload_depth==max_payload_depth) parseChunk(false);
+        payload_depth--;
+      }
+      else payload_chunk+=buffer[i];
+      if(payload_depth<0) Serial.println(F("error reading payload depth"));
+      i++;
+    }
+  }
+}
+
+void Coap::parseChunk(boolean new_object){
+  if(new_object) payload_chunk+="null";
+  if(payload_chunk.lastIndexOf('[')>payload_chunk.lastIndexOf(':')) payload_chunk+=']';
+  payload_chunk+='}';
+  //once a chunk is complete, treat it with ArduinoJson
+  StaticJsonBuffer<200> jsonBuff;
+  JsonObject& root = jsonBuff.parse(payload_chunk);
+  if(root.success()){
+    Serial.print(F("debug: Parsed correctly: "));
+    Serial.println(payload_chunk);
+    Serial.print(F("at depth "));
+    Serial.println(payload_depth);
+  }
+  const char* haha = root["haha"];
+  if(haha) Serial.println(F("yes haha"));
+  else Serial.println(F("no haha"));
+  payload_chunk="{";
 }
 
 int Coap::parseHeader(){
@@ -94,7 +132,7 @@ int Coap::parseHeader(){
   if((255&buffer[packetCursor])==PAYLOAD_START){
     payloadStartIndex_r=packetCursor+1;
   }
-  method = int(buffer[1]);
+  method = uint8_t(buffer[1]);
   optDelta=0;
 
   //return the block value if any

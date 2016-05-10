@@ -6,7 +6,7 @@
 #include <ArduinoJson.h>
 
 #include "Semantic.h"
-#define EEPROM_RESOURCE_ALLOC_SIZE 15
+#define EEPROM_RESOURCE_ALLOC_SIZE 20
 #define EEPROM_RESOURCE_NUM 3
 
 struct resource_t{

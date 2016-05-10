@@ -19,16 +19,11 @@ IPAddress ip(10, 0, 0, 2);
 unsigned int localPort = 5683;      // local port to listen o
 
 char buffer[UDP_TX_PACKET_MAX_SIZE];
-// URI-Path index and length
-// Request
+
 int op_index=-1;
 char path[EEPROM_RESOURCE_ALLOC_SIZE];
 int payloadLen = 0;
 uint8_t method = 0;
-
-//////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////
-// An EthernetUDP instance to let us send and receive packets over UDP
 
 int getPayloadLength_P(const char* payloadIndex){
   int len =0;
@@ -48,18 +43,22 @@ void setup() {
   Ethernet.begin(mac, ip);
   Udp.begin(localPort);
   Serial.begin(9600);
-  // assignment of uris to the corresponding payloads
-  //TODO: generate JSON-path-resource relationships based on JSON parsing
   rsm.resetMemory();
+  // read resources already in EEPROM
   rsm.initialize();
+  //TODO: ressources initialized automatically upon reading JSON files
   rsm.addResource(A0,"temperature",TEMPERATURE);
+  rsm.addResource(13,"light",LIGHT);
   rsm.printResources();
   //TODO: better way to retrieve resources
-  //TODO: addOperation should be called after parsing capabilities
+  //TODO: parsing capabilities should be called followed by addOperation
   char *temperatureSense = "tempSense";
-  resource_t null;
-  rsm.addOperation(&(*temperatureSense),0,-1,0);
+  char *lightSwitch = "lightSwitch";
+  //(uri, method, expects_index, returns_index);
+  rsm.addOperation(&(*temperatureSense),0,-1,rsm.idInUse("temperature"));
+  rsm.addOperation(&(*lightSwitch),1,rsm.idInUse("light"),-1);
   rsm.printOperations();
+  pinMode(rsm.resources[rsm.operations[op_index].expects_index].pin, OUTPUT);
 }
 
 void loop() {
@@ -101,36 +100,54 @@ void loop() {
       } else {
         Serial.println(F("No corresponding operation found, redirecting to '/'"));
         payloadLen = getPayloadLength_P(CAPABILITIES);
+        Serial.print(F("PL length: "));
+        Serial.println(payloadLen);
         method = 0;
       }
 
     }
     coap.readPayload();
-    // *** treat GET with block2 ***
-    if(coap.method==1) {
-      coap.writeHeader(ACK,2, VALID,(255&blockValue)>>4, payloadLen);
-      if(op_index>=0){
-        String data = String(analogRead(rsm.resources[rsm.operations[op_index].returns_index].pin),DEC);
-        //TODO: treat data separately
-        coap.writePayload(rsm.resources[rsm.operations[op_index].returns_index].json, payloadLen, data);
-      } else {
-        coap.writePayload(CAPABILITIES, payloadLen, "");
+
+
+      if(coap.method==1) {
+        coap.writeHeader(ACK,2, VALID,(255&blockValue)>>4, payloadLen);
+        if(op_index>=0){
+          String data = String(int(analogRead(rsm.resources[rsm.operations[op_index].returns_index].pin)));
+          //TODO: treat data separately
+          coap.writePayload(rsm.resources[rsm.operations[op_index].returns_index].json, payloadLen, data);
+        } else {
+          coap.writePayload(CAPABILITIES, payloadLen, "");
+        }
       }
-    }
-    // *** treat POST with block1 ***
-    // payload in the request
-    if(coap.method==2) {
-      //if no More blocks
-      if((blockValue&M)==0){
-        // TODO:
-        // Do something with the received payload
-        Serial.println(coap.request);
-        coap.request="";
+      // *** treat POST with block1 ***
+      // payload in the request
+      if(coap.method==2) {
+        if((blockValue&M)==0){
+          //if no More blocks
+          /* //Parsing the payload example
+          StaticJsonBuffer<200> postBuff;
+          JsonObject& root = postBuff.parseObject(coap.payload_chunk);
+          uint8_t value=0;
+          if(root.success()){
+              value = root["value"];
+              Serial.print(F("Got light value: "));
+              Serial.println(value);
+          }
+          uint8_t pin = rsm.resources[rsm.operations[op_index].expects_index].pin;
+          Serial.print(F("Current Pin: "));
+          Serial.println(pin);
+          if(pin<14){
+            if(value == 0)
+              digitalWrite(pin, LOW);
+            else
+              digitalWrite(pin, HIGH);
+          }*/
+        }
+        coap.writeHeader(ACK,1, CHANGED,(255&blockValue)>>4, 0);
       }
-      coap.writeHeader(ACK,1, CHANGED,(255&blockValue)>>4, 0);
+      coap.sendBuffer(Udp, coap.packetCursor);
+      coap.resetVariables();
+      delay(10);
     }
-    coap.sendBuffer(Udp, coap.packetCursor);
-    coap.resetVariables();
-    delay(10);
-  }
+
 }

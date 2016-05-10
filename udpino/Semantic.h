@@ -28,16 +28,25 @@ const char CAPABILITIES[] PROGMEM =
             "\"expects\": null,"
             "\"returns\": \"vocab:Temperature\""
             //"\"statusCodes\": []"
-          "},"
+          "}"
+        "]"
+      "},"
+      "{"
+        "\"@id\": \"vocab:CapabilitySwitchLight\","
+        "\"@type\": [\"hydra:Resource\", \"vocab:Capability\"],"
+        "\"subClassOf\": null,"
+        "\"label\": \"CapabilityLightSwitch\","
+        "\"description\": \"Capability that queries a temperature sensor\","
+        "\"supportedOperation\": ["
           "{"
-            "\"@id\": \"_:changePin\","
+            "\"@id\": \"_:lightSwitch\","
             "\"@type\": \"hydra:Operation\","
             "\"method\": \"POST\","
-            "\"label\": \"temperatureSense\","
-            //"\"description\": \"Changes the Pin to look for the temperature\","
-            "\"expects\": \"int\","
-            "\"returns\": null"
-            //"\"statusCodes\": []"
+            "\"label\": \"LightSwitch\","
+            //"\"description\": \"Retrieves a temperature measured by the temperature sensor\","
+            "\"expects\": \"vocab:Light\","
+            "\"returns\": \"vocab:Light\","
+            "\"statusCodes\": []"
           "}"
         "]"
       "}"
@@ -45,11 +54,25 @@ const char CAPABILITIES[] PROGMEM =
   "}\0"
 ;
 
+////////////////////////////////////////////////////////////////
+// RESOURCES
+///////////////////////////////////////////////////////////////
+
 const char TEMPERATURE[] PROGMEM=
   "{"
     "\"@context\": \"APICONTEXT\","
     "\"@id\": \"/temperatureSense\","
     "\"@type\": \"Temperature\","
+    "\"value\": #,"
+    "\"type\": \"°C\""
+  "}\0"
+;
+
+const char LIGHT[] PROGMEM=
+  "{"
+    "\"@context\": \"APICONTEXT\","
+    "\"@id\": \"/switchLight\","
+    "\"@type\": \"Light\","
     "\"value\": #,"
     "\"type\": \"°C\""
   "}\0"

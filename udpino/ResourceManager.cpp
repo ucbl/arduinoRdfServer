@@ -3,7 +3,9 @@
 #include "Semantic.h"
 
 ResourceManager::ResourceManager(){
-
+  resource_count=0;
+  operation_count=0;
+  last_index=-1;
 }
 
 void ResourceManager::initialize(){
@@ -126,7 +128,10 @@ void ResourceManager::setPin(uint8_t pin, char* id){
 }
 
 void ResourceManager::parseCapabilities(const char* capabilities){
-  /*
+
+  /****************************************
+  WIP
+  *****************************************
   StaticJsonBuffer<600> jsonBuffer;
   char capabilities_s[600];
   unsigned int c=0;
