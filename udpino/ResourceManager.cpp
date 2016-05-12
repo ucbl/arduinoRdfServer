@@ -83,7 +83,10 @@ void ResourceManager::addResource(uint8_t pin, char* id, const char* json){
 void ResourceManager::addOperation(char* uri, uint8_t method, int expects_index, int returns_index){
   if(uriInUse(uri)<0){
     operation_t op;
-    strcpy(op.uri,uri);
+    for(uint8_t i=0;i<EEPROM_RESOURCE_ALLOC_SIZE;i++){
+      if(i<(unsigned)strlen(uri)) op.uri[i]=uri[i];
+      else op.uri[i]='\0';
+    }
     Serial.print(F("operation added: "));
     Serial.println(op.uri);
     op.method = method;
@@ -183,14 +186,9 @@ int ResourceManager::uriInUse(char *uri){
   // uri has to have the good size
   // assume in use, return if not verified to be different
   boolean inUse;
-  for(uint8_t i=0;i<operation_count;i++){
-    inUse = true;
-    for(uint8_t j=0;j<EEPROM_RESOURCE_ALLOC_SIZE;j++)
-      if(uri[j]!='\0' && operations[i].uri[j]!=uri[j]){
-        inUse=false;
-      }
-    if(inUse) return i;
-  }
+  for(uint8_t i=0;i<operation_count;i++)
+    if(strcmp(operations[i].uri,uri)==0)
+      return i;
   return -1;
 }
 

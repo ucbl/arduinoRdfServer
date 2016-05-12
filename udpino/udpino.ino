@@ -104,50 +104,49 @@ void loop() {
         Serial.println(payloadLen);
         method = 0;
       }
-
     }
+
     coap.readPayload();
 
-
-      if(coap.method==1) {
-        coap.writeHeader(ACK,2, VALID,(255&blockValue)>>4, payloadLen);
-        if(op_index>=0){
-          String data = String(int(analogRead(rsm.resources[rsm.operations[op_index].returns_index].pin)));
-          //TODO: treat data separately
-          coap.writePayload(rsm.resources[rsm.operations[op_index].returns_index].json, payloadLen, data);
-        } else {
-          coap.writePayload(CAPABILITIES, payloadLen, "");
-        }
+    if(coap.method==1) {
+      coap.writeHeader(ACK,2, VALID,(255&blockValue)>>4, payloadLen);
+      if(op_index>=0){
+        String data = String(int(analogRead(rsm.resources[rsm.operations[op_index].returns_index].pin)));
+        //TODO: treat data separately
+        coap.writePayload(rsm.resources[rsm.operations[op_index].returns_index].json, payloadLen, data);
+      } else {
+        coap.writePayload(CAPABILITIES, payloadLen, "");
       }
-      // *** treat POST with block1 ***
-      // payload in the request
-      if(coap.method==2) {
-        if((blockValue&M)==0){
-          //if no More blocks
-          /* //Parsing the payload example
-          StaticJsonBuffer<200> postBuff;
-          JsonObject& root = postBuff.parseObject(coap.payload_chunk);
-          uint8_t value=0;
-          if(root.success()){
-              value = root["value"];
-              Serial.print(F("Got light value: "));
-              Serial.println(value);
-          }
-          uint8_t pin = rsm.resources[rsm.operations[op_index].expects_index].pin;
-          Serial.print(F("Current Pin: "));
-          Serial.println(pin);
-          if(pin<14){
-            if(value == 0)
-              digitalWrite(pin, LOW);
-            else
-              digitalWrite(pin, HIGH);
-          }*/
-        }
-        coap.writeHeader(ACK,1, CHANGED,(255&blockValue)>>4, 0);
-      }
-      coap.sendBuffer(Udp, coap.packetCursor);
-      coap.resetVariables();
-      delay(10);
     }
+    // *** treat POST with block1 ***
+    // payload in the request
+    if(coap.method==2) {
+      if((blockValue&M)==0){
+        //if no More blocks
+        /* //Parsing the payload example
+        StaticJsonBuffer<200> postBuff;
+        JsonObject& root = postBuff.parseObject(coap.payload_chunk);
+        uint8_t value=0;
+        if(root.success()){
+            value = root["value"];
+            Serial.print(F("Got light value: "));
+            Serial.println(value);
+        }
+        uint8_t pin = rsm.resources[rsm.operations[op_index].expects_index].pin;
+        Serial.print(F("Current Pin: "));
+        Serial.println(pin);
+        if(pin<14){
+          if(value == 0)
+            digitalWrite(pin, LOW);
+          else
+            digitalWrite(pin, HIGH);
+        }*/
+      }
+      coap.writeHeader(ACK,1, CHANGED,(255&blockValue)>>4, 0);
+    }
+    coap.sendBuffer(Udp, coap.packetCursor);
+    coap.resetVariables();
+    delay(10);
+  }
 
 }

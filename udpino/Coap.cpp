@@ -103,12 +103,11 @@ void Coap::parseChunk(boolean new_object){
   //once a chunk is complete, treat it with ArduinoJson
   StaticJsonBuffer<200> jsonBuff;
   JsonObject& root = jsonBuff.parse(payload_chunk);
-  if(root.success()){
-    Serial.print(F("debug: Parsed correctly: "));
+  if(!root.success()){
+    Serial.print(F("error parsing: "));
     Serial.println(payload_chunk);
-    Serial.print(F("at depth "));
-    Serial.println(payload_depth);
   }
+  // Testing if "haha" exist as a field in the JSON chunk
   const char* haha = root["haha"];
   if(haha) Serial.println(F("yes haha"));
   else Serial.println(F("no haha"));
