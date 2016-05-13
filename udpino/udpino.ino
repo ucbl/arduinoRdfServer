@@ -47,14 +47,17 @@ void setup() {
   // read resources already in EEPROM
   rsm.initialize();
   //TODO: ressources initialized automatically upon reading JSON files
+  rsm.addResource(0xF0,"capabilities",CAPABILITIES);
   rsm.addResource(A0,"temperature",TEMPERATURE);
   rsm.addResource(13,"light",LIGHT);
   rsm.printResources();
   //TODO: better way to retrieve resources
   //TODO: parsing capabilities should be called followed by addOperation
+  char *capabilities="";
   char *temperatureSense = "tempSense";
   char *lightSwitch = "lightSwitch";
   //(uri, method, expects_index, returns_index);
+  rsm.addOperation(&(*capabilities),0,-1,rsm.idInUse("capabilities"));
   rsm.addOperation(&(*temperatureSense),0,-1,rsm.idInUse("temperature"));
   rsm.addOperation(&(*lightSwitch),1,rsm.idInUse("light"),-1);
   rsm.printOperations();
@@ -81,9 +84,9 @@ void loop() {
         }
       } else {
         for(uint8_t i=0;i<EEPROM_RESOURCE_ALLOC_SIZE;i++){
-          if(i==0)
+          /*if(i==0)
             path[i]='/';
-          else
+          else*/
             path[i]='\0';
         }
       }
@@ -98,8 +101,8 @@ void loop() {
         Serial.println(payloadLen);
         method = rsm.operations[op_index].method;
       } else {
-        Serial.println(F("No corresponding operation found, redirecting to '/'"));
-        payloadLen = getPayloadLength_P(CAPABILITIES);
+        Serial.println(F("No corresponding operation found, redirecting to error"));
+        payloadLen = getPayloadLength_P(ERROR);
         Serial.print(F("PL length: "));
         Serial.println(payloadLen);
         method = 0;
@@ -115,7 +118,7 @@ void loop() {
         //TODO: treat data separately
         coap.writePayload(rsm.resources[rsm.operations[op_index].returns_index].json, payloadLen, data);
       } else {
-        coap.writePayload(CAPABILITIES, payloadLen, "");
+        coap.writePayload(ERROR, payloadLen, "");
       }
     }
     // *** treat POST with block1 ***

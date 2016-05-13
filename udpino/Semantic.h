@@ -20,11 +20,14 @@
 #include <Arduino.h>
 #include <avr/pgmspace.h>
 
-const char ERROR[] PROGMEM = "Unknown URI";
+const char ERROR[] PROGMEM = "{"
+  "\"@context\":\"_context_\","
+  "\"EntryPoint\":\"http://localhost:8080/\""
+"}";
 
 const char CAPABILITIES[] PROGMEM =
   "{"
-    "\"@context\": \"#context#\","
+    "\"@context\": \"_context_\","
     "\"@id\": \"/\","
     "\"@type\": \"hydra:EntryPoint\","
     "\"capabilities\": ["

@@ -81,7 +81,7 @@ void Coap::readPayload(){
       //if a new { opens, parse what was left behind at the same level
       if(buffer[i]=='{') {
         if(payload_depth+1>max_payload_depth) max_payload_depth=payload_depth+1;
-        if(payload_depth!=0) parseChunk(true);
+        if(payload_depth!=0 ) parseChunk(true);
         payload_depth++;
       }
       //if a } closes parse what was left behind at the same level
@@ -97,20 +97,22 @@ void Coap::readPayload(){
 }
 
 void Coap::parseChunk(boolean new_object){
-  if(new_object) payload_chunk+="null";
-  if(payload_chunk.lastIndexOf('[')>payload_chunk.lastIndexOf(':')) payload_chunk+=']';
-  payload_chunk+='}';
-  //once a chunk is complete, treat it with ArduinoJson
-  StaticJsonBuffer<200> jsonBuff;
-  JsonObject& root = jsonBuff.parse(payload_chunk);
-  if(!root.success()){
-    Serial.print(F("error parsing: "));
-    Serial.println(payload_chunk);
+  if(payload_chunk.indexOf(':')>=0){
+    if(new_object) payload_chunk+="null";
+    if(payload_chunk.lastIndexOf('[')>payload_chunk.lastIndexOf(':')) payload_chunk+=']';
+    payload_chunk+='}';
+    //once a chunk is complete, treat it with ArduinoJson
+    StaticJsonBuffer<200> jsonBuff;
+    JsonObject& root = jsonBuff.parse(payload_chunk);
+    if(!root.success()){
+      Serial.print(F("error parsing: "));
+      Serial.println(payload_chunk);
+    }
+    // Testing if "haha" exist as a field in the JSON chunk
+    const char* haha = root["haha"];
+    if(haha) Serial.println(F("yes haha"));
+    else Serial.println(F("no haha"));
   }
-  // Testing if "haha" exist as a field in the JSON chunk
-  const char* haha = root["haha"];
-  if(haha) Serial.println(F("yes haha"));
-  else Serial.println(F("no haha"));
   payload_chunk="{";
 }
 
