@@ -30,7 +30,7 @@ class ResourceManager{
     unsigned int operation_count;
     void initialize();
     void addResource(uint8_t pin, char* id, const char* json);
-    void addOperation(char * uri, uint8_t method, int expects_index, int returns_index);
+    void addOperation(char * uri, char* method, int expects_index, int returns_index);
     void resetMemory();
     void printResources();
     void printOperations();

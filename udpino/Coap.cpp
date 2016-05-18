@@ -102,13 +102,6 @@ void Coap::parseChunk(){
       Serial.print(F("error parsing: "));
       Serial.println(payload_chunk);
     }
-    // Testing if "haha" exist as a field in the JSON chunk
-    const char* haha = root["haha"];
-    if(haha) {
-      Serial.print(F("yes haha: "));
-      Serial.println(haha);
-    }
-    else Serial.println(F("no haha"));
   }
   payload_chunk="{";
 }

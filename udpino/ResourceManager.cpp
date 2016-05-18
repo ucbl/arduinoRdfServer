@@ -80,7 +80,12 @@ void ResourceManager::addResource(uint8_t pin, char* id, const char* json){
   }
 }
 
-void ResourceManager::addOperation(char* uri, uint8_t method, int expects_index, int returns_index){
+void ResourceManager::addOperation(char* uri, char* method, int expects_index, int returns_index){
+  /*Serial.println(F("Trying to add operation:"));
+  Serial.println(uri);
+  Serial.println(method);
+  Serial.println(expects_index);
+  Serial.println(returns_index);*/
   if(uriInUse(uri)<0){
     operation_t op;
     for(uint8_t i=0;i<EEPROM_RESOURCE_ALLOC_SIZE;i++){
@@ -89,7 +94,10 @@ void ResourceManager::addOperation(char* uri, uint8_t method, int expects_index,
     }
     Serial.print(F("operation added: "));
     Serial.println(op.uri);
-    op.method = method;
+    if(strcmp_P(method,PSTR("GET"))==0)
+      op.method = 0;
+    if(strcmp_P(method,PSTR("POST"))==0)
+      op.method = 1;
     op.expects_index = expects_index;
     op.returns_index = returns_index;
     operations[operation_count]=op;
@@ -154,17 +162,29 @@ void ResourceManager::parseChunk(String* chunk){
     //once a chunk is complete, treat it with ArduinoJson
     StaticJsonBuffer<300> jsonBuff;
     JsonObject& root = jsonBuff.parse(*chunk);
-    if(root.success()){
-      Serial.print(F("Correctly parsed: "));
+    if(!root.success()){
+      Serial.print(F("Error parsing: "));
       Serial.println(*chunk);
     }
-    const char* type = root["@type"];
-    if(strcmp_P(type,PSTR("hydra:Resource"))==0)
-      Serial.println(F("Found a Resource"));
-      //addResource(uint8_t pin, char *id, const char *json);
-    if(strcmp_P(type,PSTR("hydra:Operation"))==0)
-      Serial.println(F("Found an Operation"));
-      //addOperation(char *uri, uint8_t method, int expects_index, int returns_index);
+    JsonArray& type = root["@type"];
+    if(type.success()){
+      if(strcmp_P(type.get(0),PSTR("hydra:Resource"))==0
+        || strcmp_P(type.get(0),PSTR("vocab:Capability"))==0)
+        Serial.print(F("Found a Resource labeled "));
+        Serial.println((const char*)root["label"]);
+        //addResource(uint8_t pin, char *id, const char *json);
+    } else {
+      if(strcmp_P(root["@type"],PSTR("hydra:Operation"))==0){
+        Serial.print(F("Found an Operation labeled "));
+        Serial.println((const char*)root["label"]);
+        addOperation(
+          strdup((const char*)root["@id"]),
+          strdup((const char*)root["method"]),
+          idInUse(strdup((const char*)root["expects"])),
+          idInUse(strdup((const char*)root["returns"]))
+        );
+      }
+    }
   }
 }
 

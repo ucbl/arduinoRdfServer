@@ -45,22 +45,18 @@ void setup() {
   Serial.begin(9600);
   rsm.resetMemory();
   // read resources already in EEPROM
-  rsm.parseCapabilities(CAPABILITIES, &coap.payload_chunk);
   rsm.initialize();
   //TODO: ressources initialized automatically upon reading JSON files
   rsm.addResource(0xFF,"capabilities",CAPABILITIES);
-  rsm.addResource(A0,"temperature",TEMPERATURE);
-  rsm.addResource(13,"light",LIGHT);
+  rsm.addResource(A0,"Temperature",TEMPERATURE);
+  rsm.addResource(13,"Light",LIGHT);
   rsm.printResources();
   //TODO: better way to retrieve resources
   //TODO: parsing capabilities should be called followed by addOperation
+  rsm.parseCapabilities(CAPABILITIES, &coap.payload_chunk);
   char *capabilities="";
-  char *temperatureSense = "tempSense";
-  char *lightSwitch = "lightSwitch";
   //(uri, method, expects_index, returns_index);
-  rsm.addOperation(&(*capabilities),0,-1,rsm.idInUse("capabilities"));
-  rsm.addOperation(&(*temperatureSense),0,-1,rsm.idInUse("temperature"));
-  rsm.addOperation(&(*lightSwitch),1,rsm.idInUse("light"),-1);
+  rsm.addOperation(&(*capabilities),"GET",-1,rsm.idInUse("capabilities"));
   rsm.printOperations();
   pinMode(rsm.resources[rsm.operations[op_index].expects_index].pin, OUTPUT);
 }
