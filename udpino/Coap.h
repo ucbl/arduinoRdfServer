@@ -47,7 +47,7 @@ class Coap
     void resetVariables();
     char* buffer;
   private:
-    void parseChunk(boolean new_object);
+    void parseChunk();
     void writeOption(int optNum, int len, char* content);
     boolean readOptionDesc();
     void writeCode(char code);

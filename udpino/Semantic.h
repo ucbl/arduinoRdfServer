@@ -1,5 +1,8 @@
 #ifndef Semantic_h
 #define Semantic_h
+
+#include <Arduino.h>
+#include <avr/pgmspace.h>
 /******************************************************************************
 ***********************CONFIG**************************************************
 ******************************************************************************/
@@ -14,11 +17,8 @@
 #ifdef light_
   #define lightSwitch_
 #endif
+/******************************************************************************/
 
-
-
-#include <Arduino.h>
-#include <avr/pgmspace.h>
 
 const char ERROR[] PROGMEM = "{"
   "\"@context\":\"_context_\","
@@ -37,7 +37,7 @@ const char CAPABILITIES[] PROGMEM =
         "\"@type\": [\"hydra:Resource\", \"vocab:Capability\"],"
         "\"subClassOf\": null,"
         "\"label\": \"CapabilityTemperatureSense\","
-        "\"description\": \"Capability that queries a temperature sensor\","
+        //"\"description\": \"Capability that queries a temperature sensor\","
         "\"supportedOperation\": ["
           #ifdef tempSense_
           "{"
@@ -69,7 +69,7 @@ const char CAPABILITIES[] PROGMEM =
             "\"label\": \"LightSwitch\","
             //"\"description\": \"Retrieves a temperature measured by the temperature sensor\","
             "\"expects\": \"vocab:Light\","
-            "\"returns\": \"vocab:Light\","
+            "\"returns\": null,"
             "\"statusCodes\": []"
           "}"
         "]"
@@ -102,7 +102,7 @@ const char LIGHT[] PROGMEM=
     "\"@context\": \"APICONTEXT\","
     "\"@id\": \"/switchLight\","
     "\"@type\": \"Light\","
-    "\"value\": #,"
+    "\"value\": *,"
     "\"type\": \"°C\""
     #endif
   "}\0"

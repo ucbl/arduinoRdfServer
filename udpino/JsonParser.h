@@ -9,7 +9,7 @@ class JsonParser
 {
   public:
     JsonParser();
-    void parseResource(const char* resource);
+    void parseChunk(String chunk);
 };
 
 

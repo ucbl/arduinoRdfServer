@@ -6,7 +6,6 @@ Coap::Coap(char* payloadBuffer){
   payloadCursor=0;
   payload_chunk="{";
   payload_depth=0;
-  max_payload_depth=0;
   resetVariables();
 }
 
@@ -74,20 +73,14 @@ boolean Coap::readOptionDesc(){
 
 void Coap::readPayload(){
   //initialize max payload depth at the beginning of the payload only
-  if(payload_depth==0) max_payload_depth=0;
   if (payloadStartIndex_r!=0){
     int i=payloadStartIndex_r;
     while(i<UDP_TX_PACKET_MAX_SIZE && buffer[i]!=EMPTY){
       //if a new { opens, parse what was left behind at the same level
-      if(buffer[i]=='{') {
-        if(payload_depth+1>max_payload_depth) max_payload_depth=payload_depth+1;
-        if(payload_depth!=0 ) parseChunk(true);
-        payload_depth++;
-      }
-      //if a } closes parse what was left behind at the same level
-      else if(buffer[i]=='}') {
-        if(payload_depth==max_payload_depth) parseChunk(false);
-        payload_depth--;
+      if(buffer[i]=='{' || buffer[i]=='}') {
+        if(payload_depth!=0 ) parseChunk();
+        if(buffer[i]=='{') payload_depth++;
+        if(buffer[i]=='}') payload_depth--;
       }
       else payload_chunk+=buffer[i];
       if(payload_depth<0) Serial.println(F("error reading payload depth"));
@@ -96,13 +89,14 @@ void Coap::readPayload(){
   }
 }
 
-void Coap::parseChunk(boolean new_object){
+void Coap::parseChunk(){
   if(payload_chunk.indexOf(':')>=0){
-    if(new_object) payload_chunk+="null";
-    if(payload_chunk.lastIndexOf('[')>payload_chunk.lastIndexOf(':')) payload_chunk+=']';
+    if(payload_chunk.lastIndexOf('[')>payload_chunk.lastIndexOf(':')
+        && payload_chunk.lastIndexOf(']')<payload_chunk.lastIndexOf('['))
+      payload_chunk+=']';
     payload_chunk+='}';
     //once a chunk is complete, treat it with ArduinoJson
-    StaticJsonBuffer<200> jsonBuff;
+    StaticJsonBuffer<300> jsonBuff;
     JsonObject& root = jsonBuff.parse(payload_chunk);
     if(!root.success()){
       Serial.print(F("error parsing: "));
@@ -110,7 +104,10 @@ void Coap::parseChunk(boolean new_object){
     }
     // Testing if "haha" exist as a field in the JSON chunk
     const char* haha = root["haha"];
-    if(haha) Serial.println(F("yes haha"));
+    if(haha) {
+      Serial.print(F("yes haha: "));
+      Serial.println(haha);
+    }
     else Serial.println(F("no haha"));
   }
   payload_chunk="{";
@@ -191,18 +188,20 @@ void Coap::writePayload(const char* payloadStartIndex_w, int payloadLength, Stri
   char write_char;
   while (packetCursor<UDP_TX_PACKET_MAX_SIZE && payloadCursor<payloadLength && i<PAYLOAD_MAX_SIZE){
     write_char = pgm_read_byte(payloadStartIndex_w+payloadCursor);
-    if(write_char=='#' && data!=nullptr){
+    if(write_char=='#' && data){
       for(uint8_t j=0;j<data.length();j++){
         buffer[packetCursor]=data[j];
         variable_cursor++;
         packetCursor++;
+        i++;
       }
+      Serial.println();
     } else {
       buffer[packetCursor]=write_char;
+      packetCursor++;
+      i++;
     }
     payloadCursor++;
-    packetCursor++;
-    i++;
   }
   //once the last block of payload is written
   if(payloadCursor>=payloadLength) {

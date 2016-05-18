@@ -45,9 +45,10 @@ void setup() {
   Serial.begin(9600);
   rsm.resetMemory();
   // read resources already in EEPROM
+  rsm.parseCapabilities(CAPABILITIES, &coap.payload_chunk);
   rsm.initialize();
   //TODO: ressources initialized automatically upon reading JSON files
-  rsm.addResource(0xF0,"capabilities",CAPABILITIES);
+  rsm.addResource(0xFF,"capabilities",CAPABILITIES);
   rsm.addResource(A0,"temperature",TEMPERATURE);
   rsm.addResource(13,"light",LIGHT);
   rsm.printResources();
@@ -84,9 +85,6 @@ void loop() {
         }
       } else {
         for(uint8_t i=0;i<EEPROM_RESOURCE_ALLOC_SIZE;i++){
-          /*if(i==0)
-            path[i]='/';
-          else*/
             path[i]='\0';
         }
       }
@@ -114,9 +112,11 @@ void loop() {
     if(coap.method==1) {
       coap.writeHeader(ACK,2, VALID,(255&blockValue)>>4, payloadLen);
       if(op_index>=0){
-        String data = String(int(analogRead(rsm.resources[rsm.operations[op_index].returns_index].pin)));
+        int data = analogRead(rsm.resources[rsm.operations[op_index].returns_index].pin);
+        char s_data[3] = {0};
+        itoa(data, s_data, 10);
         //TODO: treat data separately
-        coap.writePayload(rsm.resources[rsm.operations[op_index].returns_index].json, payloadLen, data);
+        coap.writePayload(rsm.resources[rsm.operations[op_index].returns_index].json, payloadLen, s_data);
       } else {
         coap.writePayload(ERROR, payloadLen, "");
       }

@@ -6,7 +6,7 @@
 #include <ArduinoJson.h>
 
 #include "Semantic.h"
-#define EEPROM_RESOURCE_ALLOC_SIZE 20
+#define EEPROM_RESOURCE_ALLOC_SIZE 30
 #define EEPROM_RESOURCE_NUM 3
 
 struct resource_t{
@@ -35,10 +35,11 @@ class ResourceManager{
     void printResources();
     void printOperations();
     void setPin(uint8_t pin, char* id);
-    void parseCapabilities(const char* capabilities);
+    void parseCapabilities(const char* capabilities, String* chunk);
     int uriInUse(char* uri);
     int idInUse(char* id);
   private:
+    void parseChunk(String* chunk);
     int last_index;
     boolean pinInUse(byte pin);
 };

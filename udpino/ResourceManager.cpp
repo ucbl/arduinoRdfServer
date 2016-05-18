@@ -123,59 +123,53 @@ void ResourceManager::setPin(uint8_t pin, char* id){
     if(strcmp(id,resources[i].id)==0 && !pinInUse(pin)){
       resources[i].pin=pin;
       return;
-    } else {
-      //Serial.print(F("SetPin not allowed for "));
-      //Serial.println(resources[i].id);
     }
   }
 }
 
-void ResourceManager::parseCapabilities(const char* capabilities){
-
-  /****************************************
-  WIP
-  *****************************************
-  StaticJsonBuffer<600> jsonBuffer;
-  char capabilities_s[600];
-  unsigned int c=0;
-  int depth=0;
-  boolean eoc= false;
-  char* cpb_start_ptr = (char*)strchrnul_P(capabilities, int('['));
-  while(!eoc && c<600){
-    capabilities_s[c]=pgm_read_byte(cpb_start_ptr+c);
-    if(capabilities_s[c]=='[')
-      depth++;
-    if(capabilities_s[c]==']')
-      depth--;
-    if(depth == 0) {
-      //finished the chunk, mark the index
-      eoc=true;
+void ResourceManager::parseCapabilities(const char* json, String* chunk){
+  int json_depth = 0;
+  char c='c';
+  int i = 0;
+  *chunk="{";
+  while(c!='\0'){
+    c=pgm_read_byte(json+i);
+    if(c=='{' || c=='}'){
+      if(json_depth>0) parseChunk(chunk);
+      if(c=='{') json_depth++;
+      if(c=='}') json_depth--;
+      *chunk="{";
     }
-    c++;
+    else *chunk+=c;
+    i++;
   }
-  JsonArray& cpb_root = jsonBuffer.parseArray(capabilities_s);
-  JsonObject& cpb= cpb_root.get(0);
-  JsonArray& supportedOperation= cpb["supportedOperation"];
-  JsonObject& op1= supportedOperation.get(0);
-  operation_t op;
-  strcpy(op.uri,op1["@id"]);
-  if(op1["method"]=="GET") op.method=0;
-  if(op1["method"]=="POST") op.method=1;
-  strcpy(op.expects, op1["expects"]);
-  strcpy(op.returns, op1["returns"]);
-  addOperation(op);
-  */
+}
+
+void ResourceManager::parseChunk(String* chunk){
+  if((*chunk).indexOf(':')>=0){
+    if((*chunk).lastIndexOf('[')>(*chunk).lastIndexOf(':')
+        && (*chunk).lastIndexOf(']')<(*chunk).lastIndexOf('['))
+      (*chunk)+=']';
+    (*chunk)+='}';
+    //once a chunk is complete, treat it with ArduinoJson
+    StaticJsonBuffer<300> jsonBuff;
+    JsonObject& root = jsonBuff.parse(*chunk);
+    if(root.success()){
+      Serial.print(F("Correctly parsed: "));
+      Serial.println(*chunk);
+    }
+    const char* type = root["@type"];
+    if(strcmp_P(type,PSTR("hydra:Resource"))==0)
+      Serial.println(F("Found a Resource"));
+      //addResource(uint8_t pin, char *id, const char *json);
+    if(strcmp_P(type,PSTR("hydra:Operation"))==0)
+      Serial.println(F("Found an Operation"));
+      //addOperation(char *uri, uint8_t method, int expects_index, int returns_index);
+  }
 }
 
 int ResourceManager::idInUse(char* id){
-  // make sure the id can be compared
-  /*char full_id[EEPROM_RESOURCE_ALLOC_SIZE];
-  for(uint8_t i=0;i<EEPROM_RESOURCE_ALLOC_SIZE;i++){
-    if(i<strlen(id)) full_id[i]=id[i];
-    else full_id[i]=char(0);
-  }*/
   for(unsigned int i=0;i<resource_count;i++){
-    //if(strcmp(resources[i].id,full_id)==0)
     if(strcmp(resources[i].id,id)==0)
       return i;
   }
@@ -183,9 +177,6 @@ int ResourceManager::idInUse(char* id){
 }
 
 int ResourceManager::uriInUse(char *uri){
-  // uri has to have the good size
-  // assume in use, return if not verified to be different
-  boolean inUse;
   for(uint8_t i=0;i<operation_count;i++)
     if(strcmp(operations[i].uri,uri)==0)
       return i;
