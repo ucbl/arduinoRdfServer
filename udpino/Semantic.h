@@ -7,7 +7,7 @@
 ***********************CONFIG**************************************************
 ******************************************************************************/
 //RESOURCES
-#define temperature_
+//#define temperature_
 #define light_
 
 //OPERATIONS
@@ -31,16 +31,18 @@ const char CAPABILITIES[] PROGMEM =
     "\"@id\": \"/\","
     "\"@type\": \"hydra:EntryPoint\","
     "\"capabilities\": ["
-      #ifdef temperature_
+
       "{"
+      #ifdef temperature_
         "\"@id\": \"vocab:CapabilityTemperatureSense\","
         "\"@type\": [\"hydra:Resource\", \"vocab:Capability\"],"
         "\"subClassOf\": null,"
         "\"label\": \"CapabilityTemperatureSense\","
         //"\"description\": \"Capability that queries a temperature sensor\","
         "\"supportedOperation\": ["
-          #ifdef tempSense_
+
           "{"
+          #ifdef tempSense_
             "\"@id\": \"tempSense\","
             "\"@type\": \"hydra:Operation\","
             "\"method\": \"GET\","
@@ -49,13 +51,14 @@ const char CAPABILITIES[] PROGMEM =
             "\"expects\": null,"
             "\"returns\": \"Temperature\""
             //"\"statusCodes\": []"
-          "}"
           #endif
+          "}"
+
         "]"
-      "}"
       #endif
+      "},"
+      "{"
       #ifdef light_
-      ",{"
         "\"@id\": \"vocab:CapabilitySwitchLight\","
         "\"@type\": [\"hydra:Resource\", \"vocab:Capability\"],"
         "\"subClassOf\": null,"
@@ -73,8 +76,8 @@ const char CAPABILITIES[] PROGMEM =
             "\"statusCodes\": []"
           "}"
         "]"
-      "}"
       #endif
+      "}"
     "]"
   "}\0"
 ;
@@ -82,23 +85,23 @@ const char CAPABILITIES[] PROGMEM =
 ////////////////////////////////////////////////////////////////
 // RESOURCES
 ///////////////////////////////////////////////////////////////
-#ifdef temperature_
 const char TEMPERATURE[] PROGMEM=
   "{"
+    #ifdef temperature_
     "\"@context\": \"APICONTEXT\","
     "\"@id\": \"/temperatureSense\","
     "\"@type\": \"Temperature\","
     "\"value\": #,"
     "\"type\": \"°C\""
+    #endif
   "}\0"
 ;
-#endif
 
 
 const char LIGHT[] PROGMEM=
 
   "{"
-    #ifdef light
+    #ifdef light_
     "\"@context\": \"APICONTEXT\","
     "\"@id\": \"/switchLight\","
     "\"@type\": \"Light\","
