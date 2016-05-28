@@ -11,10 +11,11 @@
 
 struct resource_t{
   const char* json;
-  uint8_t pin;
   char id[EEPROM_RESOURCE_ALLOC_SIZE];
 };
 struct operation_t{
+  uint8_t pins[6];
+  uint8_t pin_count;
   char uri[EEPROM_RESOURCE_ALLOC_SIZE];
   uint8_t method;
   int expects_index;
@@ -24,23 +25,25 @@ struct operation_t{
 class ResourceManager{
   public:
     ResourceManager();
-    operation_t operations[EEPROM_RESOURCE_NUM];
-    resource_t resources[EEPROM_RESOURCE_NUM];
-    unsigned int resource_count;
+    operation_t operations[EEPROM_RESOURCE_NUM+1];
+    resource_t resources[RESOURCE_COUNT+1];
     unsigned int operation_count;
-    void initialize();
-    void addResource(uint8_t pin, char* id, const char* json);
-    void addOperation(char * uri, char* method, int expects_index, int returns_index);
+    void initialize_op();
+    void initialize_re();
+    void addResource(char* id, const char* json, uint8_t index);
+    void addEepromEntry(uint8_t pin_count, uint8_t* pins, char* uri);
+    void addOperation(char* uri, char* method, int expects_index, int returns_index);
     void resetMemory();
     void printResources();
     void printOperations();
-    void setPin(uint8_t pin, char* id);
+    void setPin(uint8_t pin_count, uint8_t* pins, char* uri);
     void parseCapabilities(const char* capabilities, String* chunk);
-    int uriInUse(char* uri);
-    int idInUse(char* id);
+    int operationInUse(char* uri);
+    int resourceInUse(char* id);
   private:
+    void completeOperation(int operation_index, char* method, int expects_index, int returns_index);
     void parseChunk(String* chunk);
-    int last_index;
+    int eeprom_cursor;
     boolean pinInUse(byte pin);
 };
 #endif

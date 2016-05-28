@@ -1,3 +1,4 @@
+
 #ifndef Semantic_h
 #define Semantic_h
 
@@ -7,7 +8,7 @@
 ***********************CONFIG**************************************************
 ******************************************************************************/
 //RESOURCES
-//#define temperature_
+#define temperature_
 #define light_
 
 //OPERATIONS
@@ -22,6 +23,7 @@
 
 const char ERROR[] PROGMEM = "{"
   "\"@context\":\"_context_\","
+  "\"@type\":\"Error\","
   "\"EntryPoint\":\"http://localhost:8080/\""
 "}";
 
@@ -31,7 +33,6 @@ const char CAPABILITIES[] PROGMEM =
     "\"@id\": \"/\","
     "\"@type\": \"hydra:EntryPoint\","
     "\"capabilities\": ["
-
       "{"
       #ifdef temperature_
         "\"@id\": \"vocab:CapabilityTemperatureSense\","
@@ -89,10 +90,11 @@ const char TEMPERATURE[] PROGMEM=
   "{"
     #ifdef temperature_
     "\"@context\": \"APICONTEXT\","
-    "\"@id\": \"/temperatureSense\","
+    "\"@id\": \"temperatureSense\","
     "\"@type\": \"Temperature\","
-    "\"value\": #,"
+    "\"value\": \"\","
     "\"type\": \"°C\""
+    //c'est une uri ^
     #endif
   "}\0"
 ;
@@ -103,12 +105,21 @@ const char LIGHT[] PROGMEM=
   "{"
     #ifdef light_
     "\"@context\": \"APICONTEXT\","
-    "\"@id\": \"/switchLight\","
+    "\"@id\": \"switchLight\","
     "\"@type\": \"Light\","
-    "\"value\": *,"
+    "\"value\": \"\","
     "\"type\": \"°C\""
     #endif
   "}\0"
 ;
+
+#define RESOURCE_COUNT 2
+
+PGM_P const json_resources[] PROGMEM =
+{
+  LIGHT,
+  TEMPERATURE
+};
+
 
 #endif

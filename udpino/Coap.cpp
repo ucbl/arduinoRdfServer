@@ -181,13 +181,14 @@ void Coap::writePayload(const char* payloadStartIndex_w, int payloadLength, Stri
   char write_char;
   while (packetCursor<UDP_TX_PACKET_MAX_SIZE && payloadCursor<payloadLength && i<PAYLOAD_MAX_SIZE){
     write_char = pgm_read_byte(payloadStartIndex_w+payloadCursor);
-    if(write_char=='#' && data){
+    if(write_char=='\"' && pgm_read_byte(payloadStartIndex_w+payloadCursor+1)=='\"' && data){
       for(uint8_t j=0;j<data.length();j++){
         buffer[packetCursor]=data[j];
         variable_cursor++;
         packetCursor++;
         i++;
       }
+      payloadCursor++;
       Serial.println();
     } else {
       buffer[packetCursor]=write_char;

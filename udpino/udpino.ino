@@ -43,22 +43,21 @@ void setup() {
   Ethernet.begin(mac, ip);
   Udp.begin(localPort);
   Serial.begin(9600);
-  rsm.resetMemory();
-  // read resources already in EEPROM
-  rsm.initialize();
-  //TODO: ressources initialized automatically upon reading JSON files
-  rsm.addResource(0xFF,"capabilities",CAPABILITIES);
-  rsm.addResource(A0,"Temperature",TEMPERATURE);
-  rsm.addResource(13,"Light",LIGHT);
+  //reset EEPROM
+  //rsm.resetMemory();
+  rsm.initialize_re();
   rsm.printResources();
-  //TODO: better way to retrieve resources
-  //TODO: parsing capabilities should be called followed by addOperation
+  // read operations already in EEPROM (useless if eeprom gets reset..)
+  rsm.initialize_op();
+  //rsm.addEepromEntry(1,(uint8_t*)0xFF,(char*)"/");
+  //uint8_t pin1=A0;
+  //uint8_t pin2=1;
+  //rsm.addEepromEntry(1,&pin1,(char*)"tempSense");
+  //rsm.addEepromEntry(1,&pin2, (char *)"lightSwitch");
   rsm.parseCapabilities(CAPABILITIES, &coap.payload_chunk);
-  char *capabilities="";
+  //TODO: parsing capabilities should be called followed by addOperation
   //(uri, method, expects_index, returns_index);
-  rsm.addOperation(&(*capabilities),"GET",-1,rsm.idInUse("capabilities"));
   rsm.printOperations();
-  pinMode(rsm.resources[rsm.operations[op_index].expects_index].pin, OUTPUT);
 }
 
 void loop() {
@@ -86,29 +85,33 @@ void loop() {
       }
       Serial.print(F("Parsed URI from CoAP request: "));
       Serial.println(path);
-      op_index = rsm.uriInUse(path);
+      op_index = rsm.operationInUse(path);
       if(op_index>=0){
-        Serial.println(F("Corresponding operation found!"));
-        payloadLen = getPayloadLength_P(rsm.resources[rsm.operations[op_index].returns_index].json);
-        Serial.println(rsm.operations[op_index].returns_index);
-        Serial.print(F("PL length: "));
+        Serial.println(F("Corresponding operation found: PL, method"));
+        if(rsm.operations[op_index].returns_index>=0)
+          payloadLen = getPayloadLength_P(rsm.resources[rsm.operations[op_index].returns_index].json);
+        else
+          payloadLen=0;
         Serial.println(payloadLen);
         method = rsm.operations[op_index].method;
+        Serial.println(method);
+        Serial.print(F("Returns: "));
+        Serial.println(rsm.operations[op_index].returns_index);
       } else {
         Serial.println(F("No corresponding operation found, redirecting to error"));
         payloadLen = getPayloadLength_P(ERROR);
-        Serial.print(F("PL length: "));
-        Serial.println(payloadLen);
         method = 0;
       }
     }
-
     coap.readPayload();
+
 
     if(coap.method==1) {
       coap.writeHeader(ACK,2, VALID,(255&blockValue)>>4, payloadLen);
       if(op_index>=0){
-        int data = analogRead(rsm.resources[rsm.operations[op_index].returns_index].pin);
+        int data = 0;
+        if(rsm.operations[op_index].pin_count>0)
+          data = analogRead(rsm.operations[op_index].pins[0]);
         char s_data[3] = {0};
         itoa(data, s_data, 10);
         //TODO: treat data separately
