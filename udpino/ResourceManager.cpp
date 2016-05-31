@@ -165,7 +165,10 @@ void ResourceManager::printOperations(){
   Serial.print(operation_count);
   Serial.println(F(" Operations in Memory"));
   for(unsigned int i=0;i<operation_count;i++){
+    Serial.print(F("uri, pin_count, method: "));
     Serial.print(operations[i].uri);
+    Serial.print(F(", "));
+    Serial.print(operations[i].pin_count);
     Serial.print(F(", "));
     Serial.println(operations[i].method);
   }

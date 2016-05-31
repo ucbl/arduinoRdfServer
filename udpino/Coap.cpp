@@ -1,15 +1,18 @@
 #include <Arduino.h>
 #include "Coap.h"
 
-Coap::Coap(char* payloadBuffer){
+Coap::Coap(char* payloadBuffer, ResourceManager* rsm_p){
+  blockType = 0;
   buffer = payloadBuffer;
   payloadCursor=0;
   payload_chunk="{";
   payload_depth=0;
+  rsm = rsm_p;
   resetVariables();
 }
 
 void Coap::resetVariables(){
+  writePayloadAllowed=false;
   packetCursor=4;
   payloadStartIndex_r=
   uri[0]=
@@ -17,6 +20,7 @@ void Coap::resetVariables(){
   blockIndex=
   optDelta=
   tokenLength=0;
+  opRefIndex = 0;
   memset(buffer,0,UDP_TX_PACKET_MAX_SIZE);
 }
 
@@ -58,6 +62,8 @@ boolean Coap::readOptionDesc(){
     if(((255&buffer[packetCursor])>>4)==13){
       packetCursor++;
     }
+    if(optNumber == 23) blockType=2;
+    if(optNumber == 27) blockType=1;
   }
 
   // 13:  An 8-bit unsigned integer follows the initial byte and
@@ -71,25 +77,31 @@ boolean Coap::readOptionDesc(){
   else return false;
 }
 
-void Coap::readPayload(){
+void Coap::readPayload(int op_index){
   //initialize max payload depth at the beginning of the payload only
-  if (payloadStartIndex_r!=0){
-    int i=payloadStartIndex_r;
-    while(i<UDP_TX_PACKET_MAX_SIZE && buffer[i]!=EMPTY){
-      //if a new { opens, parse what was left behind at the same level
-      if(buffer[i]=='{' || buffer[i]=='}') {
-        if(payload_depth!=0 ) parseChunk();
-        if(buffer[i]=='{') payload_depth++;
-        if(buffer[i]=='}') payload_depth--;
+  if(op_index>=0){
+    if (payloadStartIndex_r!=0){
+      int i=payloadStartIndex_r;
+      while(i<UDP_TX_PACKET_MAX_SIZE && buffer[i]!=EMPTY){
+        //if a new { opens, parse what was left behind at the same level
+        if(buffer[i]=='{' || buffer[i]=='}') {
+          if(payload_depth!=0 ) parseChunk(op_index);
+          if(buffer[i]=='{') payload_depth++;
+          if(buffer[i]=='}') payload_depth--;
+        }
+        else payload_chunk+=buffer[i];
+        if(payload_depth<0) Serial.println(F("error reading payload depth"));
+        i++;
       }
-      else payload_chunk+=buffer[i];
-      if(payload_depth<0) Serial.println(F("error reading payload depth"));
-      i++;
+    } else {
+      StaticJsonBuffer<10> nullbuffer;
+      JsonObject& null_obj = nullbuffer.createObject();
+      retrieveResults(null_obj, op_index);
     }
   }
 }
 
-void Coap::parseChunk(){
+void Coap::parseChunk(int op_index){
   if(payload_chunk.indexOf(':')>=0){
     if(payload_chunk.lastIndexOf('[')>payload_chunk.lastIndexOf(':')
         && payload_chunk.lastIndexOf(']')<payload_chunk.lastIndexOf('['))
@@ -101,9 +113,23 @@ void Coap::parseChunk(){
     if(!root.success()){
       Serial.print(F("error parsing: "));
       Serial.println(payload_chunk);
+    } else {
+      retrieveResults(root, op_index);
     }
   }
   payload_chunk="{";
+}
+
+void Coap::retrieveResults(JsonObject& root, int op_index){
+  for(uint8_t i=0;i<10;i++){
+    if(strcmp(rsm->operations[op_index].uri,opLabels[i])==0){
+      opRefs[i](
+        rsm->operations[rsm->operationInUse(opLabels[i])].pin_count,
+        rsm->operations[rsm->operationInUse(opLabels[i])].pins,
+        root,
+        results);
+    }
+  }
 }
 
 int Coap::parseHeader(){
@@ -156,40 +182,62 @@ void Coap::writeOption(int optNum, int len, char* content){
   }
 }
 
-void Coap::writeHeader(int type, int block, int code, int blockNum, int payloadLength){
+void Coap::writeHeader(int type, int blockValue, int payloadLength){
+  int blockNum = (255&blockValue)>>4;
   writeType(type);
-  writeCode(code);
+  if(blockType==1) writeCode(CHANGED);
+  if(blockType==2) writeCode(VALID);
   //no need to change token length or MessageID
   packetCursor=4+tokenLength;
   //TODO: A more intelligent way to treat block responses
   int more=1;
-  if(blockNum>=payloadLength/PAYLOAD_MAX_SIZE) more=0;
+  if(blockNum>=payloadLength/PAYLOAD_MAX_SIZE)
+    more=0;
   char content1[]={B00000010|(blockNum<<4)|(more<<3)};
   char content2[]={B00000010|(blockNum<<4)};
 
-  if(block==2) writeOption(23,1,content1);
-  if(block==1) writeOption(27,1,content2);
+  if(blockType==2) {
+    writeOption(23,1,content1);
+    writePayloadAllowed=true;
+  } else if(blockType==1) {
+    if((blockValue&M)==0){
+      Serial.println(F("Finished uploading, writing payload"));
+      writeOption(23,1,(char *)B00000010);
+      writePayloadAllowed=true;
+      payloadCursor=0;
+    }
+    writeOption(27,1,content2);
+  } else if(payloadLength>0){
+    Serial.println(F("Finished uploading, writing payload"));
+    writeOption(23,1,(char *)B00000010);
+    writePayloadAllowed=true;
+    payloadCursor=0;
+  }
 }
 
-void Coap::writePayload(const char* payloadStartIndex_w, int payloadLength, String data){
+void Coap::writePayload(const char* payloadStartIndex_w, int payloadLength, uint8_t resultsLength){
   buffer[packetCursor]=PAYLOAD_START;
   packetCursor++;
   //payloadCursor reads from PROGMEM
   //packetCursor writes on buffer
-  uint8_t variable_cursor= 0;
   uint8_t i=0;
   char write_char;
   while (packetCursor<UDP_TX_PACKET_MAX_SIZE && payloadCursor<payloadLength && i<PAYLOAD_MAX_SIZE){
     write_char = pgm_read_byte(payloadStartIndex_w+payloadCursor);
-    if(write_char=='\"' && pgm_read_byte(payloadStartIndex_w+payloadCursor+1)=='\"' && data){
-      for(uint8_t j=0;j<data.length();j++){
-        buffer[packetCursor]=data[j];
-        variable_cursor++;
-        packetCursor++;
-        i++;
+    if(write_char=='\"' && pgm_read_byte(payloadStartIndex_w+payloadCursor+1)=='\"'){
+      for(uint8_t j=0;j<resultsLength;j++){
+        if(results[j]!=NULL){
+          char s_data[3] = {0};
+          itoa(results[j], s_data, 10);
+          strncat(buffer, s_data, strlen(s_data));
+          results[j]=NULL;
+          packetCursor+=strlen(s_data);
+          i+=strlen(s_data);
+          j=resultsLength;
+          Serial.print(F("made it once"));
+        }
       }
       payloadCursor++;
-      Serial.println();
     } else {
       buffer[packetCursor]=write_char;
       packetCursor++;
@@ -201,4 +249,12 @@ void Coap::writePayload(const char* payloadStartIndex_w, int payloadLength, Stri
   if(payloadCursor>=payloadLength) {
     payloadCursor = 0;
   }
+}
+
+void Coap::addOperationFunction(void (*foo)(uint8_t, uint8_t[6], JsonObject&, uint8_t[6]), char* id) {
+  opRefs[opRefIndex]=foo;
+  opLabels[opRefIndex]=id;
+  Serial.print(F("Referencable function added: "));
+  Serial.println(id);
+  opRefIndex++;
 }

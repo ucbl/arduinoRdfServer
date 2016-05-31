@@ -24,6 +24,9 @@ int op_index=-1;
 char path[EEPROM_RESOURCE_ALLOC_SIZE];
 int payloadLen = 0;
 uint8_t method = 0;
+/****************************************/
+//Function pointing
+uint8_t opRefIndex = 0;
 
 int getPayloadLength_P(const char* payloadIndex){
   int len =0;
@@ -35,14 +38,16 @@ int getPayloadLength_P(const char* payloadIndex){
 }
 
 EthernetUDP Udp;
-Coap coap= Coap(buffer);
 ResourceManager rsm;
+Coap coap= Coap(buffer, &rsm);
 
 void setup() {
   // start the Ethernet and UDP:
   Ethernet.begin(mac, ip);
   Udp.begin(localPort);
   Serial.begin(9600);
+  coap.addOperationFunction(&tempSense_f, (char* )"tempSense");
+  coap.addOperationFunction(&lightSwitch_f, (char* )"lightSwitch");
   //reset EEPROM
   //rsm.resetMemory();
   rsm.initialize_re();
@@ -55,8 +60,6 @@ void setup() {
   //rsm.addEepromEntry(1,&pin1,(char*)"tempSense");
   //rsm.addEepromEntry(1,&pin2, (char *)"lightSwitch");
   rsm.parseCapabilities(CAPABILITIES, &coap.payload_chunk);
-  //TODO: parsing capabilities should be called followed by addOperation
-  //(uri, method, expects_index, returns_index);
   rsm.printOperations();
 }
 
@@ -103,49 +106,13 @@ void loop() {
         method = 0;
       }
     }
-    coap.readPayload();
-
-
-    if(coap.method==1) {
-      coap.writeHeader(ACK,2, VALID,(255&blockValue)>>4, payloadLen);
-      if(op_index>=0){
-        int data = 0;
-        if(rsm.operations[op_index].pin_count>0)
-          data = analogRead(rsm.operations[op_index].pins[0]);
-        char s_data[3] = {0};
-        itoa(data, s_data, 10);
-        //TODO: treat data separately
-        coap.writePayload(rsm.resources[rsm.operations[op_index].returns_index].json, payloadLen, s_data);
-      } else {
-        coap.writePayload(ERROR, payloadLen, "");
-      }
-    }
-    // *** treat POST with block1 ***
-    // payload in the request
-    if(coap.method==2) {
-      if((blockValue&M)==0){
-        //if no More blocks
-        /* //Parsing the payload example
-        StaticJsonBuffer<200> postBuff;
-        JsonObject& root = postBuff.parseObject(coap.payload_chunk);
-        uint8_t value=0;
-        if(root.success()){
-            value = root["value"];
-            Serial.print(F("Got light value: "));
-            Serial.println(value);
-        }
-        uint8_t pin = rsm.resources[rsm.operations[op_index].expects_index].pin;
-        Serial.print(F("Current Pin: "));
-        Serial.println(pin);
-        if(pin<14){
-          if(value == 0)
-            digitalWrite(pin, LOW);
-          else
-            digitalWrite(pin, HIGH);
-        }*/
-      }
-      coap.writeHeader(ACK,1, CHANGED,(255&blockValue)>>4, 0);
-    }
+    //TODO:determine if last payload block to enable writing tx_payload
+    coap.readPayload(op_index);
+    coap.writeHeader(ACK, blockValue, payloadLen);
+    if(coap.writePayloadAllowed)
+      coap.writePayload(rsm.resources[rsm.operations[op_index].returns_index].json, payloadLen, rsm.operations[op_index].pin_count);
+    else if(op_index<0)
+      coap.writePayload(ERROR, payloadLen, 0);
     coap.sendBuffer(Udp, coap.packetCursor);
     coap.resetVariables();
     delay(10);
