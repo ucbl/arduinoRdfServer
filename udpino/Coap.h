@@ -50,6 +50,8 @@ class Coap
     void resetVariables();
     char* buffer;
     bool writePayloadAllowed;
+    bool writeResultsAllowed;
+    bool error;
     // Function Pointers
     void (*opRefs[10])(uint8_t, uint8_t[6], JsonObject&, uint8_t[6]);
     char* opLabels[10];

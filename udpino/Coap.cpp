@@ -5,9 +5,11 @@ Coap::Coap(char* payloadBuffer, ResourceManager* rsm_p){
   blockType = 0;
   buffer = payloadBuffer;
   payloadCursor=0;
-  payload_chunk="{";
+  payload_chunk='{';
   payload_depth=0;
   rsm = rsm_p;
+  error =
+  writeResultsAllowed = false;
   resetVariables();
 }
 
@@ -19,7 +21,7 @@ void Coap::resetVariables(){
   uri[1]=
   blockIndex=
   optDelta=
-  tokenLength=0;
+  tokenLength=
   opRefIndex = 0;
   memset(buffer,0,UDP_TX_PACKET_MAX_SIZE);
 }
@@ -79,9 +81,10 @@ boolean Coap::readOptionDesc(){
 
 void Coap::readPayload(int op_index){
   //initialize max payload depth at the beginning of the payload only
-  if(op_index>=0){
+  if(!writePayloadAllowed){
     if (payloadStartIndex_r!=0){
       int i=payloadStartIndex_r;
+      payload_chunk="{";
       while(i<UDP_TX_PACKET_MAX_SIZE && buffer[i]!=EMPTY){
         //if a new { opens, parse what was left behind at the same level
         if(buffer[i]=='{' || buffer[i]=='}') {
@@ -89,26 +92,33 @@ void Coap::readPayload(int op_index){
           if(buffer[i]=='{') payload_depth++;
           if(buffer[i]=='}') payload_depth--;
         }
-        else payload_chunk+=buffer[i];
+        else {
+          payload_chunk+=buffer[i];
+        }
         if(payload_depth<0) Serial.println(F("error reading payload depth"));
         i++;
       }
     } else {
-      StaticJsonBuffer<10> nullbuffer;
-      JsonObject& null_obj = nullbuffer.createObject();
-      retrieveResults(null_obj, op_index);
+      if(writeResultsAllowed){
+        Serial.println(F("no payload to parse"));
+        StaticJsonBuffer<10> nullbuffer;
+        JsonObject& null_obj = nullbuffer.createObject();
+        retrieveResults(null_obj, op_index);
+        writeResultsAllowed=false;
+      }
     }
   }
 }
 
 void Coap::parseChunk(int op_index){
-  if(payload_chunk.indexOf(':')>=0){
+  Serial.println(F("parsing received payload"));
+  if(payload_chunk.lastIndexOf(':')>=0){
     if(payload_chunk.lastIndexOf('[')>payload_chunk.lastIndexOf(':')
         && payload_chunk.lastIndexOf(']')<payload_chunk.lastIndexOf('['))
       payload_chunk+=']';
     payload_chunk+='}';
     //once a chunk is complete, treat it with ArduinoJson
-    StaticJsonBuffer<300> jsonBuff;
+    StaticJsonBuffer<200> jsonBuff;
     JsonObject& root = jsonBuff.parse(payload_chunk);
     if(!root.success()){
       Serial.print(F("error parsing: "));
@@ -116,6 +126,10 @@ void Coap::parseChunk(int op_index){
     } else {
       retrieveResults(root, op_index);
     }
+  } else {
+    Serial.print(F("Here's your problem "));
+    Serial.println(payload_chunk.lastIndexOf(':'));
+    Serial.println(payload_chunk);
   }
   payload_chunk="{";
 }
@@ -195,6 +209,8 @@ void Coap::writeHeader(int type, int blockValue, int payloadLength){
     more=0;
   char content1[]={B00000010|(blockNum<<4)|(more<<3)};
   char content2[]={B00000010|(blockNum<<4)};
+  char firstBlock2[]={B00000010};
+  char firstBlock2M[]={B00001010};
 
   if(blockType==2) {
     writeOption(23,1,content1);
@@ -202,14 +218,20 @@ void Coap::writeHeader(int type, int blockValue, int payloadLength){
   } else if(blockType==1) {
     if((blockValue&M)==0){
       Serial.println(F("Finished uploading, writing payload"));
-      writeOption(23,1,(char *)B00000010);
+      if(payloadLength>PAYLOAD_MAX_SIZE)
+        writeOption(23,1,firstBlock2M);
+      else
+        writeOption(23,1,firstBlock2);
       writePayloadAllowed=true;
       payloadCursor=0;
     }
     writeOption(27,1,content2);
   } else if(payloadLength>0){
     Serial.println(F("Finished uploading, writing payload"));
-    writeOption(23,1,(char *)B00000010);
+    if(payloadLength>PAYLOAD_MAX_SIZE)
+      writeOption(23,1,firstBlock2M);
+    else
+      writeOption(23,1,firstBlock2);
     writePayloadAllowed=true;
     payloadCursor=0;
   }
@@ -234,7 +256,6 @@ void Coap::writePayload(const char* payloadStartIndex_w, int payloadLength, uint
           packetCursor+=strlen(s_data);
           i+=strlen(s_data);
           j=resultsLength;
-          Serial.print(F("made it once"));
         }
       }
       payloadCursor++;
@@ -248,6 +269,7 @@ void Coap::writePayload(const char* payloadStartIndex_w, int payloadLength, uint
   //once the last block of payload is written
   if(payloadCursor>=payloadLength) {
     payloadCursor = 0;
+    error = false;
   }
 }
 

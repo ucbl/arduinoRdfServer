@@ -48,9 +48,9 @@ void ResourceManager::initialize_op(){
       //place the cursor where a new entry WOULD be
     }
   }
-  addOperation("", "GET", -1, resourceInUse("capabilities"));
   Serial.print(operation_count);
   Serial.println(F(" operations currently in EEPROM"));
+  addOperation("", "GET", -1, resourceInUse("capabilities"));
 }
 
 void ResourceManager::initialize_re(){
@@ -127,8 +127,6 @@ void ResourceManager::addEepromEntry(uint8_t pin_count, uint8_t* pins, char* uri
 }
 
 void ResourceManager::addOperation(char* uri, char* method, int expects_index, int returns_index){
-  Serial.print(F("Adding by force "));
-  Serial.println(returns_index);
   for(uint8_t i=0;i<EEPROM_RESOURCE_ALLOC_SIZE;i++){
     if(i<strlen(uri))
       operations[operation_count].uri[i] = uri[i];
