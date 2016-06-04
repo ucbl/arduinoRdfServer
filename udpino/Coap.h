@@ -2,8 +2,9 @@
 #define Coap_h
 
 #include <Arduino.h>
+#include <ArduinoJson.h>
 #include <EthernetUdp2.h>
-
+#include "ResourceManager.h"
 // *** type ***
 #define ACK B00100000
 #define CON B00000000
@@ -24,31 +25,43 @@
 class Coap
 {
   public:
-    Coap(char* payloadBuffer);
+    ResourceManager* rsm;
+    Coap(char* payloadBuffer, ResourceManager* rsm_p);
     int parseHeader();
-
     int packetCursor;
     int payloadCursor;
     int tokenLength;
     int uri[2];
-    String path;
     int optDelta;
+    uint8_t payload_depth;
+    uint8_t max_payload_depth;
     // Request
-    int method;
+    uint8_t method;
     int payloadStartIndex_r;
-    String request;
-    int const_payload_index;
-    int payloadLen;
+    String payload_chunk;
     // Blocks
     int blockIndex;
+    uint8_t blockType;
+    char payloadData[10];
     void sendBuffer(EthernetUDP Udp, int sendSize);
-    void writeHeader(int type, int block, int code, int blockNum, int payloadLength);
-    void writePayload(const char* payloadStartIndex, int payloadLength, char variable);
-    void readPayload();
+    void writeHeader(int type, int blockNum, int payloadLength);
+    void writePayload(const char* payloadStartIndex, int payloadLength, uint8_t resultLength);
+    void readPayload(int op_index);
     void resetVariables();
-  private:
-    int variable_cursor;
     char* buffer;
+    bool writePayloadAllowed;
+    bool writeResultsAllowed;
+    bool error;
+    // Function Pointers
+    void (*opRefs[10])(uint8_t, uint8_t[6], JsonObject&, uint8_t[6]);
+    char* opLabels[10];
+    uint8_t opRefIndex ;
+    uint8_t results[10];
+    void addOperationFunction(void (*foo)(uint8_t, uint8_t[6], JsonObject&, uint8_t[6]), char* id);
+    void retrieveResults(JsonObject& root, int op_index);
+    bool newOperation;
+  private:
+    void parseChunk(int op_index);
     void writeOption(int optNum, int len, char* content);
     boolean readOptionDesc();
     void writeCode(char code);
