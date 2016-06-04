@@ -56,9 +56,10 @@ class Coap
     void (*opRefs[10])(uint8_t, uint8_t[6], JsonObject&, uint8_t[6]);
     char* opLabels[10];
     uint8_t opRefIndex ;
-    uint8_t results[6];
+    uint8_t results[10];
     void addOperationFunction(void (*foo)(uint8_t, uint8_t[6], JsonObject&, uint8_t[6]), char* id);
     void retrieveResults(JsonObject& root, int op_index);
+    bool newOperation;
   private:
     void parseChunk(int op_index);
     void writeOption(int optNum, int len, char* content);

@@ -64,7 +64,7 @@ void setup() {
   coap.addOperationFunction(&tempSense_f, (char* )"tempSense");
   coap.addOperationFunction(&lightSwitch_f, (char* )"lightSwitch");
   //reset EEPROM
-  //rsm.resetMemory();
+  //rsm.refreshEeprom();
   rsm.initialize_re();
   rsm.printResources();
   // read operations already in EEPROM (useless if eeprom gets reset..)
@@ -87,7 +87,8 @@ void loop() {
     Udp.read(buffer, UDP_TX_PACKET_MAX_SIZE);
     int blockValue = coap.parseHeader();
     // if it's the first block
-    if(((255&blockValue)>>4)==0){
+    if(((255&blockValue)>>4)==0 && coap.payloadCursor==0){
+      coap.payloadCursor = 0;
       getPath(&coap);
       op_index = rsm.operationInUse(path);
       if(op_index>=0){
@@ -110,12 +111,19 @@ void loop() {
     }
     //if(blockValue&M==0)
     //  coap.writeResultsAllowed=true;
-    coap.readPayload(op_index);
-    if(coap.results[5]==1)
+    if(coap.method!=rsm.operations[op_index].method ||
+      coap.results[5]==1)
       coap.error=true;
+    // read incoming payload ONLY if method!=GET
+    if(coap.method!=1){
+      coap.readPayload(op_index);
+      if(coap.newOperation)
+        rsm.parseCapabilities(CAPABILITIES, &coap.payload_chunk);
+        rsm.printOperations();
+        coap.newOperation=false;
+    }
+
     if(!coap.error){
-      Serial.print(F("payloadCursor: "));
-      Serial.println(coap.payloadCursor);
       coap.writeHeader(ACK, blockValue, payloadLen);
       if(coap.writePayloadAllowed)
         coap.writePayload(rsm.resources[rsm.operations[op_index].returns_index].json, payloadLen, rsm.operations[op_index].pin_count);

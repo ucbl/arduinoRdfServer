@@ -16,211 +16,148 @@
  ArduinoJson library by Benoît Blanchon
  https://github.com/bblanchon/ArduinoJson
 
- Modification: 
+ Modification:
     Lionel Médini, June 2015
     Remy Rojas, March 2016
 
 */
+#include <Arduino.h>
 
-// *** NETWORK CONFIG ***
-
-#include <SPI.h>
+#include <SPI.h>         // needed for Arduino versions later than 0018
 #include <Ethernet2.h>
-#include <ArduinoJson.h>
+#include <EthernetUdp2.h>         // UDP library from: bjoern@cs.stanford.edu 12/30/2008
+#include <EEPROM.h>
+#include "Coap.h"
+#include "Semantic.h"
+#include "ResourceManager.h"
+
+// Enter a MAC address and IP address for your controller below.
+// The IP address will be dependent on your local network:
 
 byte mac[] = {
   0x90, 0xA2, 0xDA, 0x10, 0x18, 0x6F
 };
 IPAddress ip(10, 0, 0, 2);
 
-EthernetServer server(80);
+unsigned int localPort = 5683;      // local port to listen o
 
-// *** RESOURCE CONFIG **
-#define BLUETOOTH_CODE 1
-#define TEMPERATURE_CODE 2
-#define LIGHT_CODE 3
-//... (max: 4 bits -> 16 types of devices)
+char buffer[UDP_TX_PACKET_MAX_SIZE];
 
-// *** MODEL ***
-void switchLight(boolean on){
-  if(on) digitalWrite(LIGHT_CODE, HIGH);
-  else digitalWrite(LIGHT_CODE, LOW);
-}
-float getTemp(int analog) {
-  //Formula found at https://learn.adafruit.com/tmp36-temperature-sensor/using-a-temp-sensor
-  return ((analogRead(analog) * 3300. / 1024.) - 500.) / 10.;
-}
+int op_index=-1;
+char path[EEPROM_RESOURCE_ALLOC_SIZE];
+int payloadLen = 0;
+uint8_t method = 0;
+/****************************************/
+//Function pointing
+uint8_t opRefIndex = 0;
 
-// *** Store first input header line ***
-boolean receiveInput(EthernetClient& client, String& input){
-  while(client.connected()){
-    if(client.available()){
-      char c = client.read();
-      if(c!='\r' && c!='\n') input += c;
-      else return true;
+void getPath(Coap* coap){
+  if(coap->uri[1]!=0){
+    for(uint8_t i=0;i<EEPROM_RESOURCE_ALLOC_SIZE;i++){
+      if(i<coap->uri[1])
+        path[i]=coap->buffer[coap->uri[0]+i];
+      else
+        path[i]='\0';
+    }
+  } else {
+    for(uint8_t i=0;i<EEPROM_RESOURCE_ALLOC_SIZE;i++){
+        path[i]='\0';
     }
   }
-  return false;
-}
-// *** Determine the client's method ***
-int parseMethod(String& input){
-  int firstSpaceIndex = input.indexOf(' ');
-  if(input.substring(0,firstSpaceIndex).compareTo("POST")==0) return 1;
-  else if(input.substring(0,firstSpaceIndex).compareTo("PUT")==0) return 2; 
-  else if(input.substring(0,firstSpaceIndex).compareTo("OPTIONS")==0) return 3;
-  // *** GET by default ***
-  else return 0;
 }
 
-// *** Extract a specific element from the requested Url ***
-// Determine which Element to extract by
-// indexing the correct prefix slash
-void extractUrlElement(String& input, int element, String& output){
-  // Find URL start/end indexes
-  int slashIndex = input.indexOf('/');
-  int urlEndIndex = input.indexOf(' ', slashIndex);
-  bool error = false;
-  // Move to the correct element
-  for (int i=0; i<element; i++) {
-    slashIndex = input.indexOf('/',slashIndex+1);
-    if(slashIndex > urlEndIndex) error = true;
+int getPayloadLength_P(const char* payloadIndex){
+  int len =0;
+  while(pgm_read_byte(payloadIndex)!='\0'){
+    len++;
+    payloadIndex++;
   }
-  // Store the element, flag if invalid
-  if(error)  output = "";
-  else
-  // Check whether it's the last element of the URL 
-  if(input.indexOf('/', slashIndex+1) > urlEndIndex){
-    output = input.substring(slashIndex+1, input.indexOf(' ',slashIndex+1));
-  } 
-  else output = input.substring(slashIndex+1, input.indexOf('/',slashIndex+1));
-} 
-
-/*
-  Perform an operation using the request
-  EG.
-  00100111 -> POST, light 0011, value
-  */
-JsonObject& performOperation(String& input, int method, JsonBuffer& jsonBuffer){
-  JsonObject& root = jsonBuffer.createObject();
-  // GET
-  if (method==0){
-    // Reuse an instantiated
-    // String in order to save
-    // memory space
-    String element="";
-    extractUrlElement(input, 0, element);
-    // GET /
-    if (element.compareTo("")==0){
-      root["@context"]= "__interoperability__contexts/Device";
-      root["id"]= "arduino_uno";
-      root["name"]= "Arduino Uno";
-      root["description"]= "Arduino Uno Board with 2KB memory";
-      root["capabilities"]= "/capabilities";
-    }
-    // GET /capabilities
-    if (element.compareTo("capabilities")==0){
-      extractUrlElement(input, 1, element);
-      // Now element is the second
-      // entry in the URL
-      if(element.compareTo("")==0){
-        root["@context"]= "__interoperability__contexts/Collection";
-        root["@type"]= "hydra:Collection";
-        root["@id"]= "/capabilities";
-        JsonArray& members = root.createNestedArray("members");
-          // *** list the capabilities ***
-          JsonObject& temperatureSense = members.createNestedObject();
-            temperatureSense["@id"]= "/capabilities/temperatureSense";
-            temperatureSense["@type"]= "vocab:Capability";
-      }
-      // GET /cabilities/temperatureSense
-      if (element.compareTo("temperatureSense")){
-        JsonObject& context= root.createNestedObject("@context");
-          context["vocab"]= "__interoperability__vocab#";
-          context["hydra"]= "http://www.w3.org/ns/hydra/core";
-        root["@id"]= "/capabilities/temperatureSense";
-        JsonArray& type = root.createNestedArray("@type");
-          type.add("hydra:Resource");
-          type.add("vocab:Capability");
-        root["label"]= "CapabilityTemperatureSense";
-        root["description"]= "Capability to sense temperature";
-        JsonArray& operations = root.createNestedArray("supportedOperation");
-          JsonObject& operation1 = operations.createNestedObject();
-            operation1["@id"]= "_:temperatureSense";
-            operation1["@type"]= "hydra:Operation";
-            operation1["method"]= "GET";
-            operation1["label"]= "temperatureSense";
-            operation1["description"]= "Retrieves a temperature measured by the temperature sensor";
-            operation1["expects"]= "";
-            operation1["returns"]= "vocab:Temperature";
-            JsonArray& statusCodes = operation1.createNestedArray("statusCodes");
-      }
-    }
-  }
-
-  return root;
-} 
-// *** Build Header according to a status code ***
-void buildResponseHeader(EthernetClient& client, int code){
-  if (code=200){
-    client.println("HTTP/1.1 200 OK"); 
-    client.println("Content-Type: application/ld+json");
-    client.println("Access-Control-Allow-Origin: *");
-    client.println("Access-Control-Allow-Methods: POST, GET, PUT, OPTIONS");
-    client.println("Connection: close");
-    client.println();
-  }
+  return len;
 }
 
-// *** SETUP ***
+EthernetUDP Udp;
+ResourceManager rsm;
+Coap coap= Coap(buffer, &rsm);
+
 void setup() {
-  // Open serial communications and wait for port to open:
-  Serial.begin(9600);
-  pinMode(LIGHT_CODE,OUTPUT);
-  // start the Ethernet connection and the server:
+  // start the Ethernet and UDP:
   Ethernet.begin(mac, ip);
-  server.begin();
-  Serial.print("server is at ");
-  Serial.println(Ethernet.localIP());
+  Udp.begin(localPort);
+  Serial.begin(9600);
+  coap.addOperationFunction(&tempSense_f, (char* )"tempSense");
+  coap.addOperationFunction(&lightSwitch_f, (char* )"lightSwitch");
+  //reset EEPROM
+  //rsm.refreshEeprom();
+  rsm.initialize_re();
+  rsm.printResources();
+  // read operations already in EEPROM (useless if eeprom gets reset..)
+  rsm.initialize_op();
+  //rsm.addEepromEntry(1,(uint8_t*)0xFF,(char*)"/");
+  //uint8_t pin1=A0;
+  //uint8_t pin2=2;
+  //rsm.addEepromEntry(1,&pin1,(char*)"tempSense");
+  //rsm.addEepromEntry(1,&pin2, (char *)"lightSwitch");
+  rsm.parseCapabilities(CAPABILITIES, &coap.payload_chunk);
+  rsm.printOperations();
 }
 
-// *** NORMAL FUNCTIONING ***
 void loop() {
-  // listen for incoming clients
-  EthernetClient client = server.available();
-  if (client) {
-    String input=""; 
-    if (receiveInput(client,input)) {
-      int method = parseMethod(input);
-      // *** Response ***
-      StaticJsonBuffer<200> jsonBuffer;
-      JsonObject& root = performOperation(input, method, jsonBuffer);
-      /*root["input"]= input;
-      root["method"]= method;
-      JsonObject& url = root.createNestedObject("url");
-        url["location"]= location;
-        url["device"]= device;
-        url["value"]= value;
-      */
-      buildResponseHeader(client, 200);
-      root.prettyPrintTo(client);
-      delay(1);
-      client.stop();
-      Serial.println("client disconnected");
+  // if there's data available, read a packet
+  int packetSize = Udp.parsePacket();
+  if (packetSize)
+  {
+    //load the buffer with the incomming request
+    Udp.read(buffer, UDP_TX_PACKET_MAX_SIZE);
+    int blockValue = coap.parseHeader();
+    // if it's the first block
+    if(((255&blockValue)>>4)==0 && coap.payloadCursor==0){
+      coap.payloadCursor = 0;
+      getPath(&coap);
+      op_index = rsm.operationInUse(path);
+      if(op_index>=0){
+        if(rsm.operations[op_index].returns_index>=0)
+          payloadLen = getPayloadLength_P(rsm.resources[rsm.operations[op_index].returns_index].json);
+        else{
+          payloadLen=0;
+        }
+        Serial.println(payloadLen);
+        method = rsm.operations[op_index].method;
+        Serial.println(method);
+        Serial.print(F("Returns: "));
+        Serial.println(rsm.resources[rsm.operations[op_index].returns_index].id);
+      } else {
+        coap.error = true;
+        Serial.println(F("Error"));
+      }
+      if(rsm.operations[op_index].expects_index<0)
+        coap.writeResultsAllowed=true;
     }
+    //if(blockValue&M==0)
+    //  coap.writeResultsAllowed=true;
+    if(coap.method!=rsm.operations[op_index].method ||
+      coap.results[5]==1)
+      coap.error=true;
+    // read incoming payload ONLY if method!=GET
+    if(coap.method!=1){
+      coap.readPayload(op_index);
+      if(coap.newOperation)
+        rsm.parseCapabilities(CAPABILITIES, &coap.payload_chunk);
+        rsm.printOperations();
+        coap.newOperation=false;
+    }
+
+    if(!coap.error){
+      coap.writeHeader(ACK, blockValue, payloadLen);
+      if(coap.writePayloadAllowed)
+        coap.writePayload(rsm.resources[rsm.operations[op_index].returns_index].json, payloadLen, rsm.operations[op_index].pin_count);
+    }
+    else {
+      coap.writeHeader(ACK, blockValue, getPayloadLength_P(ERROR));
+      coap.writePayload(ERROR, getPayloadLength_P(ERROR), 0);
+    }
+    coap.sendBuffer(Udp, coap.packetCursor);
+    coap.resetVariables();
+    delay(10);
   }
+
 }
-
-
-/*Construct the response bit by bit (from highest to lowest level):
-  0   1 2   3 4 5 6   7
-  X | X X | X X X X | X 
-  0 | method | device | value set/not set
-  Method: 00 = GET, 01 = POST, 10 = PUT, 11 = OPTIONS
-  Sensor / actuator type: 4 bits, according to the configuration
-  Value (only for POST & PUT): 0 = value not set, 1 = value set
-  
-  0   1 2 3 4 5 6 7
-  X | X X X X X X X
-  1 | error code
-  Error code: 0000000 = parse error, 0100000 = method error, 1000000 = url error, 11XXXXX = other errors
-*/
