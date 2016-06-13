@@ -115,6 +115,7 @@ void loop() {
     int blockValue = coap.parseHeader();
     // if it's the first block
     if(((255&blockValue)>>4)==0 && coap.payloadCursor==0){
+      coap.writeResultsAllowed=true;
       coap.payloadCursor = 0;
       getPath(&coap);
       op_index = rsm.operationInUse(path);
@@ -137,19 +138,18 @@ void loop() {
         coap.writeResultsAllowed=true;
     }
     //if(blockValue&M==0)
-    //  coap.writeResultsAllowed=true;
-    if(coap.method!=rsm.operations[op_index].method ||
-      coap.results[5]==1)
-      coap.error=true;
-    // read incoming payload ONLY if method!=GET
-    if(coap.method!=1){
-      coap.readPayload(op_index);
-      if(coap.newOperation)
-        rsm.parseCapabilities(CAPABILITIES, &coap.payload_chunk);
-        rsm.printOperations();
-        coap.newOperation=false;
-    }
 
+    if(coap.method!=rsm.operations[op_index].method ||
+        coap.results[5]==1)
+      coap.error=true;
+
+    coap.readPayload(op_index);
+    if(coap.newOperation && coap.method!=1){
+      rsm.parseCapabilities(CAPABILITIES, &coap.payload_chunk);
+      rsm.printOperations();
+      coap.newOperation=false;
+    }
+  
     if(!coap.error){
       coap.writeHeader(ACK, blockValue, payloadLen);
       if(coap.writePayloadAllowed)

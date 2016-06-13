@@ -128,34 +128,37 @@ void Coap::parseChunk(int op_index){
 }
 
 void Coap::retrieveResults(JsonObject& root, int op_index){
-  for(uint8_t i=0;i<10;i++){
-    if(strcmp(rsm->operations[op_index].uri,opLabels[i])==0 && rsm->operations[op_index].user_defined){
-      opRefs[i](
-        rsm->operations[rsm->operationInUse(opLabels[i])].pin_count,
-        rsm->operations[rsm->operationInUse(opLabels[i])].pins,
-        root,
-        results);
-    }
-  }
-  if(strcmp_P(rsm->operations[op_index].uri,PSTR("eepromReset"))==0){
-    Serial.println(F("--calling eepromReset"));
-    for(uint8_t i=0;i<rsm->operation_count;i++){
-      if(rsm->operations[i].user_defined){
-        memset(rsm->operations[i].uri, '\0', EEPROM_RESOURCE_ALLOC_SIZE);
-        memset(rsm->operations[i].pins, NULL, 6);
-        rsm->operations[i].pin_count = 0;
+  if(writeResultsAllowed){
+    for(uint8_t i=0;i<10;i++){
+      if(strcmp(rsm->operations[op_index].uri,opLabels[i])==0 && rsm->operations[op_index].user_defined){
+        opRefs[i](
+          rsm->operations[rsm->operationInUse(opLabels[i])].pin_count,
+          rsm->operations[rsm->operationInUse(opLabels[i])].pins,
+          root,
+          results);
       }
     }
-    rsm->refreshEeprom();
-    rsm->initialize_op();
-  } else if(strcmp_P(rsm->operations[op_index].uri,PSTR("eepromAdd"))==0){
-    Serial.println(F("--calling eepromAdd"));
-    if(rsm->operationInUse((const char *)root["uri"])<0){
-      JsonArray& json_pins = root["pins"].asArray();
-      rsm->addEepromEntry((int)root["pin_count"], json_pins,(const char *)root["uri"]);
+    if(strcmp_P(rsm->operations[op_index].uri,PSTR("eepromReset"))==0){
+      Serial.println(F("--calling eepromReset"));
+      for(uint8_t i=0;i<rsm->operation_count;i++){
+        if(rsm->operations[i].user_defined){
+          memset(rsm->operations[i].uri, '\0', EEPROM_RESOURCE_ALLOC_SIZE);
+          memset(rsm->operations[i].pins, NULL, 6);
+          rsm->operations[i].pin_count = 0;
+        }
+      }
+      rsm->refreshEeprom();
       rsm->initialize_op();
-      newOperation = true;
+    } else if(strcmp_P(rsm->operations[op_index].uri,PSTR("eepromAdd"))==0){
+      Serial.println(F("--calling eepromAdd"));
+      if(rsm->operationInUse((const char *)root["uri"])<0){
+        JsonArray& json_pins = root["pins"].asArray();
+        rsm->addEepromEntry((int)root["pin_count"], json_pins,(const char *)root["uri"]);
+        rsm->initialize_op();
+        newOperation = true;
+      }
     }
+    writeResultsAllowed=false;
   }
 }
 
@@ -264,7 +267,7 @@ void Coap::writePayload(const char* payloadStartIndex_w, int payloadLength, uint
         if(results[j]!=NULL){
           char s_data[3] = {0};
           itoa(results[j], s_data, 10);
-          strncat(buffer, s_data, strlen(s_data));
+          strncpy(buffer+packetCursor, s_data, strlen(s_data));
           results[j]=NULL;
           packetCursor+=strlen(s_data);
           i+=strlen(s_data);
