@@ -30,7 +30,12 @@ class HttpServer(resource.Resource):
 		self.request = request
 		return server.NOT_DONE_YET
 
-	#callback function when a CoAP message is received
+	def render_PUT(self, request):
+		self.arduinoAgent.putResource(request, self)
+		self.request = request
+		return server.NOT_DONE_YET
+
+    #callback function when a CoAP message is received
 	def _delayedResponse(self, result):
 		self.request.write(result.payload)
 		self.request.finish()
@@ -49,6 +54,14 @@ class CoapAgent():
 
 	def postResource(self, httpRequest, httpServer):
 		request = coap.Message(code=coap.POST, payload=httpRequest.content.getvalue())
+		request.opt.uri_path = (httpRequest.path[1:],)
+		request.remote = ('10.0.0.2', coap.COAP_PORT)
+		d = coapProtocol.request(request)
+		d.addCallback(httpServer._delayedResponse)
+		d.addErrback(self.noResponse)
+
+   	def putResource(self, httpRequest, httpServer):
+		request = coap.Message(code=coap.PUT, payload=httpRequest.content.getvalue())
 		request.opt.uri_path = (httpRequest.path[1:],)
 		request.remote = ('10.0.0.2', coap.COAP_PORT)
 		d = coapProtocol.request(request)

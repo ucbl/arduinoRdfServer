@@ -1,28 +1,20 @@
 /*
-  Web Server
+  Semantic Web Server
 
- A simple web server that shows the value of the analog input pins.
- using an Arduino Wiznet Ethernet shield.
+  Simple server capable of linking sensor functions to REST services through JSON-LD annotation.
 
- Circuit:
- * Ethernet shield attached to pins 10, 11, 12, 13
- * Analog inputs attached to pins A0 through A5 (optional)
+  In this example : Light Switch and Temperature Sense functions can be enabled, configured and querried.
+  Different setups can be arranged through REST calls without the need of flashing new software.
 
- created 18 Dec 2009
- by David A. Mellis
- modified 9 Apr 2012
- by Tom Igoe
+  Sensor level functions are decoupled from the server, so that users are encouraged to modify them according to their needs.
+
+  New functions can be added at compilation time as long as users provide the information in the JSON-LD EntryPoint.
 
  ArduinoJson library by Benoît Blanchon
  https://github.com/bblanchon/ArduinoJson
 
-<<<<<<< 5bdeb1c6ce8b1ee1d69ea38f1ed6b11108a3e8ae
- Modification:
     Lionel Médini, June 2015
     Remy Rojas, March 2016
-=======
- Modification: Lionel Médini, June 2015
- Modification: Remy Rojas, March 2016
 
 */
 #include <Arduino.h>
@@ -84,23 +76,17 @@ ResourceManager rsm;
 Coap coap= Coap(buffer, &rsm);
 
 void setup() {
-  // start the Ethernet and UDP:
+  // *******************************
+  // link functions in Semantic.cpp with JSON-LD descriptions
+  coap.addOperationFunction(&tempSense_f, (char* )"tempSense");
+  coap.addOperationFunction(&lightSwitch_f, (char* )"lightSwitch");
+  // ******************************
   Ethernet.begin(mac, ip);
   Udp.begin(localPort);
   Serial.begin(9600);
-  coap.addOperationFunction(&tempSense_f, (char* )"tempSense");
-  coap.addOperationFunction(&lightSwitch_f, (char* )"lightSwitch");
-  //reset EEPROM
-  //rsm.refreshEeprom();
   rsm.initialize_re();
   rsm.printResources();
-  // read operations already in EEPROM (useless if eeprom gets reset..)
   rsm.initialize_op();
-  //rsm.addEepromEntry(1,(uint8_t*)0xFF,(char*)"/");
-  //uint8_t pin1=A0;
-  //uint8_t pin2=2;
-  //rsm.addEepromEntry(1,&pin1,(char*)"tempSense");
-  //rsm.addEepromEntry(1,&pin2, (char *)"lightSwitch");
   rsm.parseCapabilities(CAPABILITIES, &coap.payload_chunk);
   rsm.printOperations();
 }
@@ -137,19 +123,17 @@ void loop() {
       if(rsm.operations[op_index].expects_index<0)
         coap.writeResultsAllowed=true;
     }
-    //if(blockValue&M==0)
-
+    // look for errors
     if(coap.method!=rsm.operations[op_index].method ||
         coap.results[5]==1)
       coap.error=true;
-
     coap.readPayload(op_index);
     if(coap.newOperation && coap.method!=1){
       rsm.parseCapabilities(CAPABILITIES, &coap.payload_chunk);
       rsm.printOperations();
       coap.newOperation=false;
     }
-  
+    // if no errors proceed normally, otherwise return error
     if(!coap.error){
       coap.writeHeader(ACK, blockValue, payloadLen);
       if(coap.writePayloadAllowed)
@@ -159,6 +143,7 @@ void loop() {
       coap.writeHeader(ACK, blockValue, getPayloadLength_P(ERROR));
       coap.writePayload(ERROR, getPayloadLength_P(ERROR), 0);
     }
+
     coap.sendBuffer(Udp, coap.packetCursor);
     coap.resetVariables();
     delay(10);

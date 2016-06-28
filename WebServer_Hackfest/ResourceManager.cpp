@@ -7,10 +7,9 @@ ResourceManager::ResourceManager(){
   eeprom_cursor=-1;
 }
 
+//checks the variables stored in eeprom and loads
+//the operations structure with them
 void ResourceManager::initialize_op(){
-  //checks the variables stored in eeprom and loads
-  //the operations object with them
-
   operation_count=0;
   bool on_value=false;
   uint8_t val = 0x00;
@@ -34,12 +33,9 @@ void ResourceManager::initialize_op(){
         eeprom_cursor++;
       }
       on_value=true;
-    //if separator
     } else {
-      //when we find a first NULL byte the message has ended
-      //A.K.A. do once
+      //when we find a first NULL byte the entry has ended
       if(on_value==true){
-        //fill the uri properly
         for(uint8_t j=i-operations[operation_count].pin_count-eeprom_cursor;j<EEPROM_RESOURCE_ALLOC_SIZE;j++)
           operations[operation_count].uri[j]='\0';
         on_value=false;
@@ -51,11 +47,13 @@ void ResourceManager::initialize_op(){
   }
   Serial.print(operation_count);
   Serial.println(F(" operations currently in EEPROM"));
+  // Add operations on EEPROM and Entrypoint
   addOperation("", "GET", -1, resourceInUse("capabilities"),false);
-  addOperation("eepromReset", "POST", -1, -1, false);
-  addOperation("eepromAdd", "POST", resourceInUse("EepromEntry"), -1, false);
+  addOperation("reset", "PUT", -1, -1, false);
+  addOperation("enable", "PUT", resourceInUse("EepromEntry"), -1, false);
 }
 
+// Fetch information about JSON files into resource structures
 void ResourceManager::initialize_re(){
   for(uint8_t i=0;i<RESOURCE_COUNT;i++){
     String buff = "{";
@@ -79,6 +77,7 @@ void ResourceManager::initialize_re(){
   addResource("capabilities", CAPABILITIES, RESOURCE_COUNT);
 }
 
+
 void ResourceManager::addResource(char* id, const char* json, uint8_t index){
   if(resourceInUse(id)>=0){
     //not allowed to add the same id twice
@@ -95,10 +94,10 @@ void ResourceManager::addResource(char* id, const char* json, uint8_t index){
   }
 }
 
+// Add a new entry in EEPROM usually from the /enable PUT request
 void ResourceManager::addEepromEntry(int pin_count, JsonArray& pins, const char* uri){
   //add information to eeprom
-  //if it is in eeprom already it would be also in memory (initialize_op)
-  //so check in memory
+  //if it is in eeprom already it would also be in memory since it corresponds to an operation (initialize_op)
   if(operationInUse(uri)<0){
     Serial.print(F("Adding EEPROM entry: "));
     Serial.println(uri);
@@ -115,14 +114,10 @@ void ResourceManager::addEepromEntry(int pin_count, JsonArray& pins, const char*
     eeprom_cursor+= j+1;
     Serial.print(F("eeprom_cursor once done:"));
     Serial.println(eeprom_cursor);
-  } /*else if(pin_count == (int)operations[operationInUse(uri)].pin_count){
-    Serial.print(F("Modifying EEPROM entry: "));
-    Serial.println(uri);
-
-  }*/
+  }
 }
 
-
+// Add an operation directly from the source code
 void ResourceManager::addOperation(char* uri, char* method, int expects_index, int returns_index, bool user_defined){
   for(uint8_t i=0;i<EEPROM_RESOURCE_ALLOC_SIZE;i++){
     if(i<strlen(uri))
@@ -134,16 +129,20 @@ void ResourceManager::addOperation(char* uri, char* method, int expects_index, i
   operation_count++;
 }
 
+
 void ResourceManager::completeOperation(int operation_index,char* method, int expects_index, int returns_index, bool user_defined){
   if(strcmp_P(method,PSTR("GET"))==0)
     operations[operation_index].method = 1;
   if(strcmp_P(method,PSTR("POST"))==0)
     operations[operation_index].method = 2;
+  if(strcmp_P(method,PSTR("PUT"))==0)
+    operations[operation_index].method = 3;
   operations[operation_index].expects_index = expects_index;
   operations[operation_index].returns_index = returns_index;
   operations[operation_index].user_defined = user_defined;
 }
 
+// Initialize EEPROM with the values stored in RAM
 void ResourceManager::refreshEeprom(){
   for (uint16_t i=0;i<1024;i++)
     EEPROM.write(i,0x00);
@@ -166,6 +165,7 @@ void ResourceManager::refreshEeprom(){
   }
 }
 
+// Print resources to Serial output
 void ResourceManager::printResources(){
   Serial.println(F("----------Resources in RAM:"));
   for(unsigned int i=0;i<RESOURCE_COUNT+1;i++){
@@ -173,6 +173,7 @@ void ResourceManager::printResources(){
   }
 }
 
+// Print operations to Serial output
 void ResourceManager::printOperations(){
   Serial.print(F("----------"));
   Serial.print(operation_count);
@@ -200,6 +201,7 @@ void ResourceManager::setPin(uint8_t pin_count, uint8_t* pins, char* uri){
   }
 }
 
+// Parse the Entrypoint to complete operations
 void ResourceManager::parseCapabilities(const char* json, String* chunk){
   int json_depth = 0;
   char c='c';
@@ -217,6 +219,7 @@ void ResourceManager::parseCapabilities(const char* json, String* chunk){
     i++;
   }
 }
+
 
 void ResourceManager::parseChunk(String* chunk){
   if((*chunk).indexOf(':')>=0){

@@ -71,8 +71,6 @@ boolean Coap::readOptionDesc(){
 
   // 13:  An 8-bit unsigned integer follows the initial byte and
   // indicates the Option Delta minus 13.
-
-
   packetCursor+=int(optLength)+1;
   optDelta=optNumber;
   // return whether there are more options
@@ -100,7 +98,6 @@ void Coap::readPayload(int op_index){
       i++;
     }
   } else {
-    Serial.println(F("no payload to parse"));
     StaticJsonBuffer<10> nullbuffer;
     JsonObject& null_obj = nullbuffer.createObject();
     retrieveResults(null_obj, op_index);
@@ -138,8 +135,8 @@ void Coap::retrieveResults(JsonObject& root, int op_index){
           results);
       }
     }
-    if(strcmp_P(rsm->operations[op_index].uri,PSTR("eepromReset"))==0){
-      Serial.println(F("--calling eepromReset"));
+    if(strcmp_P(rsm->operations[op_index].uri,PSTR("reset"))==0){
+      Serial.println(F("--calling reset"));
       for(uint8_t i=0;i<rsm->operation_count;i++){
         if(rsm->operations[i].user_defined){
           memset(rsm->operations[i].uri, '\0', EEPROM_RESOURCE_ALLOC_SIZE);
@@ -149,8 +146,8 @@ void Coap::retrieveResults(JsonObject& root, int op_index){
       }
       rsm->refreshEeprom();
       rsm->initialize_op();
-    } else if(strcmp_P(rsm->operations[op_index].uri,PSTR("eepromAdd"))==0){
-      Serial.println(F("--calling eepromAdd"));
+    } else if(strcmp_P(rsm->operations[op_index].uri,PSTR("enable"))==0){
+      Serial.println(F("--calling enable"));
       if(rsm->operationInUse((const char *)root["uri"])<0){
         JsonArray& json_pins = root["pins"].asArray();
         rsm->addEepromEntry((int)root["pin_count"], json_pins,(const char *)root["uri"]);
@@ -163,8 +160,6 @@ void Coap::retrieveResults(JsonObject& root, int op_index){
 }
 
 int Coap::parseHeader(){
-  // *** store packet into buffer ***
-  // tkl offset
   tokenLength=(15&buffer[0]);
   packetCursor=4+tokenLength;
   // check and read options
@@ -175,7 +170,7 @@ int Coap::parseHeader(){
       options = readOptionDesc();
     }
   }
-  // *** check if payload ***
+  // *** check if payload in request***
   if((255&buffer[packetCursor])==PAYLOAD_START){
     payloadStartIndex_r=packetCursor+1;
   }
@@ -194,7 +189,7 @@ int Coap::parseHeader(){
 }
 
 void Coap::writeOption(int optNum, int len, char* content){
-  // write the length option's length
+  // write the option's length
   if(len<16)  buffer[packetCursor]=EMPTY|len;
   // write the option's number
   if(optNum-optDelta>12){
@@ -205,7 +200,6 @@ void Coap::writeOption(int optNum, int len, char* content){
     buffer[packetCursor]|=(optNum-optDelta)<<4;
     packetCursor++;
   }
-  // write the option's
   for(int i=0;i<len;i++) {
     buffer[packetCursor]=content[i];
     packetCursor++;
@@ -217,8 +211,24 @@ void Coap::writeHeader(int type, int blockValue, int payloadLength){
   writeType(type);
   if(blockType==1) writeCode(CHANGED);
   else if(blockType==2) writeCode(VALID);
-  else writeCode(VALID);
-  //no need to change token length or MessageID
+  else {
+    Serial.print(F("method: "));
+    Serial.println(method);
+    switch (method){
+      case 1:
+        writeCode(VALID);
+        break;
+      case 2:
+        writeCode(CHANGED);
+        break;
+      case 3:
+        writeCode(CHANGED);
+        break;
+      default:
+        writeCode(VALID);
+        break;
+    }
+  }
   packetCursor=4+tokenLength;
   int more=1;
   if(blockNum>=payloadLength/PAYLOAD_MAX_SIZE)
@@ -256,12 +266,13 @@ void Coap::writeHeader(int type, int blockValue, int payloadLength){
 void Coap::writePayload(const char* payloadStartIndex_w, int payloadLength, uint8_t resultsLength){
   buffer[packetCursor]=PAYLOAD_START;
   packetCursor++;
-  //payloadCursor reads from PROGMEM
-  //packetCursor writes on buffer
+  //payloadCursor reads from PROGMEM RESOURCES
+  //packetCursor writes on outbound buffer
   uint8_t i=0;
   char write_char;
   while (packetCursor<UDP_TX_PACKET_MAX_SIZE && payloadCursor<payloadLength && i<PAYLOAD_MAX_SIZE){
     write_char = pgm_read_byte(payloadStartIndex_w+payloadCursor);
+    // Variables are written instead of double \"\" in RESOURCES
     if(write_char=='\"' && pgm_read_byte(payloadStartIndex_w+payloadCursor+1)=='\"'){
       for(uint8_t j=0;j<resultsLength;j++){
         if(results[j]!=NULL){
