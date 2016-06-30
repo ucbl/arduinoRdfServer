@@ -1,5 +1,5 @@
 # ArduinoRdfServer
-Web server for aduino Uno that send its sensor data in RDF. Users are encouraged to describe their own REST services and link them to typical Arduino functions.
+Web server for aduino Uno that sends its sensor data in RDF. Users are encouraged to describe their own REST services and link them to typical Arduino functions.
 
 Once powered up, one can configure which pins go to which function, as well as enabling and disabling available services.
 
