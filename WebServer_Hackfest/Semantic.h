@@ -28,7 +28,9 @@
 
   const char CAPABILITIES[] PROGMEM =
     "{"
-      "\"@context\": \"_context_\","
+      "\"@context\": {"
+       "\"hydra\": \"http://www.w3.org/ns/hydra/core#\""
+      "},"
       "\"@id\": \"/\","
       "\"@type\": \"hydra:EntryPoint\","
       "\"capabilities\": ["
