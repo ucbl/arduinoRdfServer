@@ -12,7 +12,8 @@ Each service contains an input/output data type. In our example we used simplifi
 
 > Both the functions and the input/output types are meant to be modified and do not influence the algorithm.
 
-Packets are transmitted with [CoAP](tools.ietf.org/html/rfc7252).
+Packets are transmitted using a partial implementation of [CoAP](tools.ietf.org/html/rfc7252).
+
 **Optionally**, one can run our included translate proxy to communicate in HTTP.
 
 ##Requirements
@@ -35,4 +36,22 @@ Once everything is in place, make sure the proxy and the Arduino are on the same
 
 Build and Flash.
 
+##Usage
+
+This version does not implement DHCP. The default IP is 10.0.0.2.
+> To modify the default IP edit the line containing: IPAddress ip(10, 0, 0, 2);
+
+Once connected and powered up, requesting a GET on root ``/`` will display the services available and their description. In order to use a service you must first enable it.
+
+The ``enable`` request is a PUT, and takes in a JSON document containing the following:
+* "uri" : the service identifier e.g. tempSense ``string``
+* "pin_count" : the amount of pins on the Arduino that are going to be used ``int``
+* "pins" : an array of pins mentioned above ``int[]``
+
+It enables the service on the given pins
+
+The ``reset`` request is an empty PUT. It resets all services.
+
+> Enabled services stay enabled as long as ``reset`` is not requested, even if power is down or a new sketch is flashed
+> This is done thanks to the fact configuration is stored in [EEPROM](https://www.arduino.cc/en/Reference/EEPROM)
 
