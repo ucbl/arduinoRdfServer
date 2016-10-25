@@ -1,0 +1,72 @@
+{
+	"@context" : {
+		"vocab:","coap://mydevice.co#",
+		"asawoo":"http://liris.cnrs.fr/asawoo/ontology/asawoo-hydra.jsonld#",
+        "hydra":"http://www.w3.org/ns/hydra/core#",
+		"owl": "http://www.w3.org/2002/07/owl#",
+        "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+        "rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+        "xsd": "http://www.w3.org/2001/XMLSchema#",
+		"description": "rdfs:comment"
+	},
+    "@id":"coap://mydevice.co",
+	"@type": "ApiDocumentation",
+    "hydra:supportedClass": [
+		{
+			"@id": "vocab:EntryPoint",
+            "@type": "asawoo:Entrypoint"
+		},
+		{
+			"@id":"vocab:temperatureSensor",
+			"@type" : ["hydra:Resource","asawoo:Capability"],
+			"description": "Retrieves a temperature.",
+			"hydra:supportedOperation" : [
+				{
+					"@id": "_:senseTemp",
+					"@type": "asawoo:capability_retrieve",
+					"returns": "vocab:Temperature"
+				}
+			]
+		},
+		{
+			"@id": "vocab:lightSwitch",
+			"@type": ["hydra:Resource","asawoo:Capability"],
+			"description" : "Switches on or off the light.",
+			"hydra:supportedOperation" : [
+				{
+					"@id": "_:switchLight",
+					"@type": "asawoo:capability_replace",
+					"expects": "vocab:LEDStatus"
+				},
+				{
+					"@id": "_:getSwitchStatus",
+					"@type": "asawoo:capability_retrieve",
+					"returns": "vocab:LEDStatus"
+				}
+			]
+		},
+        {
+            "@id": "vocab:Temperature",
+            "@type": ["http://ontology.tno.nl/saref/#Temperature","asawoo:Value"],
+            "description": "The value returned by a Sensor for a Temperature reading, as specified in SAREF."
+        },
+        {
+            "@id": "vocab:LEDStatus",
+            "@type": [
+				{
+					"@type": "owl:Restriction",
+					"owl:onProperty": { "@id": "rdf:predicate" },
+					"owl:hasValue": { "@id": "vocab:hasStatus" }
+				},
+				"asawoo:Command"
+			],
+            "description" : "A simple graph (one triple including a boolean value) representing the fact that a LED is either on or off."
+        },
+		{
+			"@id": "vocab:hasStatus",
+			"@type": "rdf:Property",
+			"rdfs:domain": "asawoo:Capability",
+			"rdfs:range": "xsd:boolean"
+		}
+	]
+}
