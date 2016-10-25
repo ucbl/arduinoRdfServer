@@ -2,19 +2,19 @@
 	"@context" : {
 		"vocab:","coap://mydevice.co#",
 		"asawoo":"http://liris.cnrs.fr/asawoo/ontology/asawoo-hydra.jsonld#",
-        "hydra":"http://www.w3.org/ns/hydra/core#",
+		"hydra":"http://www.w3.org/ns/hydra/core#",
 		"owl": "http://www.w3.org/2002/07/owl#",
-        "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
-        "rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
-        "xsd": "http://www.w3.org/2001/XMLSchema#",
+		"rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+		"rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+		"xsd": "http://www.w3.org/2001/XMLSchema#",
 		"description": "rdfs:comment"
 	},
-    "@id":"coap://mydevice.co",
+	"@id":"coap://mydevice.co",
 	"@type": "ApiDocumentation",
-    "hydra:supportedClass": [
+	"hydra:supportedClass": [
 		{
 			"@id": "vocab:EntryPoint",
-            "@type": "asawoo:Entrypoint"
+			"@type": "asawoo:Entrypoint"
 		},
 		{
 			"@id":"vocab:temperatureSensor",
@@ -45,14 +45,14 @@
 				}
 			]
 		},
-        {
-            "@id": "vocab:Temperature",
-            "@type": ["http://ontology.tno.nl/saref/#Temperature","asawoo:Value"],
-            "description": "The value returned by a Sensor for a Temperature reading, as specified in SAREF."
-        },
-        {
-            "@id": "vocab:LEDStatus",
-            "@type": [
+		{
+			"@id": "vocab:Temperature",
+			"@type": ["http://ontology.tno.nl/saref/#Temperature","asawoo:Value"],
+			"description": "The value returned by a Sensor for a Temperature reading, as specified in SAREF."
+		},
+		{
+			"@id": "vocab:LEDStatus",
+			"@type": [
 				{
 					"@type": "owl:Restriction",
 					"owl:onProperty": { "@id": "rdf:predicate" },
@@ -60,8 +60,8 @@
 				},
 				"asawoo:Command"
 			],
-            "description" : "A simple graph (one triple including a boolean value) representing the fact that a LED is either on or off."
-        },
+			"description" : "A simple graph (one triple including a boolean value) representing the fact that a LED is either on or off."
+		},
 		{
 			"@id": "vocab:hasStatus",
 			"@type": "rdf:Property",
