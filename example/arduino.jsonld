@@ -1,15 +1,15 @@
 {
 	"@context" : {
-		"vocab:","coap://mydevice.co#",
-		"asawoo":"http://liris.cnrs.fr/asawoo/ontology/asawoo-hydra.jsonld#",
-		"hydra":"http://www.w3.org/ns/hydra/core#",
+		"vocab:": "coap://mydevice.co#",
+		"asawoo": "http://liris.cnrs.fr/asawoo/ontology/asawoo-hydra.jsonld#",
+		"hydra": "http://www.w3.org/ns/hydra/core#",
 		"owl": "http://www.w3.org/2002/07/owl#",
 		"rdfs": "http://www.w3.org/2000/01/rdf-schema#",
 		"rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
 		"xsd": "http://www.w3.org/2001/XMLSchema#",
 		"description": "rdfs:comment"
 	},
-	"@id":"coap://mydevice.co",
+	"@id": "coap://mydevice.co",
 	"@type": "ApiDocumentation",
 	"hydra:supportedClass": [
 		{
@@ -56,17 +56,18 @@
 				{
 					"@type": "owl:Restriction",
 					"owl:onProperty": { "@id": "rdf:predicate" },
-					"owl:hasValue": { "@id": "vocab:hasStatus" }
+					"owl:hasValue": {
+						"@id": "vocab:hasStatus",
+						"@type": "rdf:Property",
+						"rdfs:domain": "asawoo:Capability",
+						"rdfs:range": "xsd:boolean"
+					}
 				},
-				"asawoo:Command"
+				"asawoo:Command",
+				"rdf:Statement"
 			],
+			"rdfs:subClassOf": "rdf:Statement",
 			"description" : "A simple graph (one triple including a boolean value) representing the fact that a LED is either on or off."
-		},
-		{
-			"@id": "vocab:hasStatus",
-			"@type": "rdf:Property",
-			"rdfs:domain": "asawoo:Capability",
-			"rdfs:range": "xsd:boolean"
 		}
 	]
 }
