@@ -16,14 +16,14 @@ Packets are transmitted using a partial implementation of [CoAP](tools.ietf.org/
 
 **Optionally**, one can run our included translate proxy to communicate in HTTP.
 
-##Requirements
+## Requirements
 * Ethernet Shield 2
 * [Arduino.ORG SDK](http://www.arduino.org/downloads) **Not compatible with the _Arduino.CC_ version**
 * [ArduinoJSON](https://github.com/bblanchon/ArduinoJson) download and add to your Arduino _libraries_ folder
 * [Twisted Framework](http://twistedmatrix.com/trac/) (optional)
 * [TxThings](https://github.com/mwasilak/txThings) (optional)
 
-##Installation
+## Installation
 Download [ArduinoJSON](https://github.com/bblanchon/ArduinoJson) and add it to your Arduino _libraries_ folder
 
 To use the proxy, make sure you have [Python2](https://www.python.org/) and [Pip](https://pypi.python.org/pypi/pip) then run:
@@ -36,7 +36,7 @@ Once everything is in place, make sure the proxy and the Arduino are on the same
 
 Build and Flash.
 
-##Usage
+## Usage
 
 This version does not implement DHCP. The default IP is 10.0.0.2.
 > To modify the default IP edit the line containing: IPAddress ip(10, 0, 0, 2);
@@ -55,9 +55,9 @@ The ``reset`` request is an empty PUT. It resets all services.
 > Enabled services stay enabled as long as ``reset`` is not requested, even if power is down or a new sketch is flashed
 > This is done thanks to the fact configuration is stored in [EEPROM](https://www.arduino.cc/en/Reference/EEPROM)
 
-##Extensions
+## Extensions
 
-###Adding a Service
+### Adding a Service
 
 To add a service (written in Hydra), simply insert it into ``const char CAPABILITIES[] PROGMEM`` in Semantic.h.
 It must contain the following fields:
@@ -70,7 +70,7 @@ It must contain the following fields:
 
 The service still needs to call a function (and return a Resource).
 
-####Adding a Function triggered by a service
+#### Adding a Function triggered by a service
 
 To add a function declare it as: ``void function_name(uint8_t pin_count, uint8_t pins[n], JsonObject& root, uint8_t results[6])`` in Semantic.h and Semantic.cpp.
 * uint8_t pin_count : number of pins used by the service (same as described when enabling the service, see [Usage](https://github.com/ucbl/arduinoRdfServer/edit/master/README.md#Usage)
@@ -82,7 +82,7 @@ Finally in WebServer_Hackfest.ino, you must link the function to the correspondi
 
 The ``uint8_t results`` array is used when composing the response. It is used to complement the output JSON document that represents the requested Resource. More information below.
 
-####Adding an Resource
+#### Adding an Resource
 
 To add a new Resource, create a variable ``const char VARIABLE_NAME[] PROGMEM`` in Semantic.h containing a JSON-LD document.
 Make sure to include a ``"@type"`` field: it will be used to identify the variable when reading the service's ``"expects"`` or ``"returns"`` fields.
